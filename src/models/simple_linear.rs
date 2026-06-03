@@ -10,8 +10,6 @@ use rand::Rng;
 use rand::seq::SliceRandom;
 use std::io::Write;
 
-// parametrize tensors
-
 pub fn some<B: Backend>(
     inputs: &Tensor<Autograd<B>, 2>,
     targets: &Tensor<Autograd<B>, 2>,

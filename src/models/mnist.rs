@@ -202,16 +202,16 @@ impl MNIST {
                 let label_slice = &batch.labels.as_slice()[i * 10..(i + 1) * 10];
                 let actual = label_slice.iter().enumerate().max_by(|a, b| a.1.partial_cmp(b.1).unwrap()).unwrap().0 as u8;
                 let pred_slice = &output[i * 10..(i + 1) * 10];
-                println!("Predicted probabilities: {:?}", pred_slice);
                 let predicted = pred_slice.iter().enumerate().max_by(|a, b| a.1.partial_cmp(b.1).unwrap()).unwrap().0 as u8;         
                 
                 if predicted == actual {
                     correct += 1;
                 } else {
                     println!("Misclassified: Predicted {}, Actual {}", predicted, actual);
+                    println!("Predicted probabilities: {:?}", pred_slice);
                     // data to u8
-                    let image: Vec<u8> = input.as_slice()[i * 784..(i + 1) * 784].iter().map(|&x| (x * 255.0) as u8).collect();
-                    self.dump_failed_image(predicted, actual, i, &image, "failed_images");
+                    // let image: Vec<u8> = input.as_slice()[i * 784..(i + 1) * 784].iter().map(|&x| (x * 255.0) as u8).collect();
+                    // self.dump_failed_image(predicted, actual, i, &image, "failed_images");
                 }
                 total += 1;
             }
@@ -219,26 +219,26 @@ impl MNIST {
         correct as Scalar / total as Scalar
     }
     // dump failed image under given folder
-    fn dump_failed_image(&self, predicted: u8, actual: u8, id: usize, image: &[u8], folder: &str) {
-        use std::fs;
-        use std::io::Write;
-        use std::path::Path;
+    // fn dump_failed_image(&self, predicted: u8, actual: u8, id: usize, image: &[u8], folder: &str) {
+    //     use std::fs;
+    //     use std::io::Write;
+    //     use std::path::Path;
 
-        let filename = format!("{}/pred_{}_actual_{}_{id}.pgm", folder, predicted, actual);
-        let path = Path::new(&filename);
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).expect("Failed to create directories");
-        }
-        // write as visible image format
-        let file = fs::File::create(&filename).expect("Failed to create file");
-        let mut w = BufWriter::new(file);
+    //     let filename = format!("{}/pred_{}_actual_{}_{id}.pgm", folder, predicted, actual);
+    //     let path = Path::new(&filename);
+    //     if let Some(parent) = path.parent() {
+    //         fs::create_dir_all(parent).expect("Failed to create directories");
+    //     }
+    //     // write as visible image format
+    //     let file = fs::File::create(&filename).expect("Failed to create file");
+    //     let mut w = BufWriter::new(file);
 
-        // Header
-        w.write_all(b"P5\n").unwrap();
-        w.write_all(b"28 28\n").unwrap();
-        w.write_all(b"255\n").unwrap();
+    //     // Header
+    //     w.write_all(b"P5\n").unwrap();
+    //     w.write_all(b"28 28\n").unwrap();
+    //     w.write_all(b"255\n").unwrap();
 
-        // Pixel data (row-major)
-        w.write_all(image).unwrap();
-    }
+    //     // Pixel data (row-major)
+    //     w.write_all(image).unwrap();
+    // }
 }

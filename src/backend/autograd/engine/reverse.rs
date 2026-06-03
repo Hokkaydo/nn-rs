@@ -328,11 +328,14 @@ impl AutogradStrategy for ReverseMode {
                     accumulate(node.input_ids[0], ga, &mut grads);
                 }
 
-                GradOp::ScatterAdd { .. } => {
+                GradOp::ScatterAdd { axis, indices } => {
                     // d/dtarget = go (grad flows through unchanged)
                     // d/dsrc    = gather(go, axis, indices)
-                    // For simplicity: pass gradient through to target only for now
-                    accumulate(node.input_ids[0], go, &mut grads);
+                    accumulate(node.input_ids[0], go.clone(), &mut grads);
+                    if node.input_ids.len() > 1 {
+                        let gsrc = go.gather_at(*axis, indices);
+                        accumulate(node.input_ids[1], gsrc, &mut grads);
+                    }
                 }
 
                 GradOp::Sigmoid => {
@@ -352,18 +355,22 @@ impl AutogradStrategy for ReverseMode {
 
                 GradOp::Softmax => {
                     // Jacobian-vector product: output * (go - sum(go * output, keepdim))
+                    // Softmax is over the last axis (matches the forward kernel), so the
+                    // reduction axis follows the value's rank rather than a hardcoded 1.
                     let out = GradValue::<B>::from_id(node.output_id, node.output_ndim);
-                    let dot = go.clone().mul(&out).sum_axes(&[1]);
+                    let last = out.ndim() - 1;
+                    let dot = go.clone().mul(&out).sum_axes(&[last]);
                     let dot_bcast = dot.broadcast_to_id(out.id());
                     let ga = out.clone().mul(&go.sub(&dot_bcast));
                     accumulate(node.input_ids[0], ga, &mut grads);
                 }
 
                 GradOp::LogSoftmax => {
-                    // d/da = go - exp(output) * sum(go, keepdim)
+                    // d/da = go - exp(output) * sum(go, keepdim) over the last axis.
                     let out = GradValue::<B>::from_id(node.output_id, node.output_ndim);
                     let softmax = out.exp();
-                    let sum_go = go.clone().sum_axes(&[1]);
+                    let last = softmax.ndim() - 1;
+                    let sum_go = go.clone().sum_axes(&[last]);
                     let sum_bcast = sum_go.broadcast_to_id(softmax.id());
                     let ga = go.sub(&softmax.mul(&sum_bcast));
                     accumulate(node.input_ids[0], ga, &mut grads);

@@ -359,7 +359,6 @@ impl<B: Backend> GradValue<B> {
     }
 
     pub fn scatter_add_at(self, src: Self, axis: usize, indices: &[usize]) -> Self {
-        use crate::backend::backend::ViewOps;
         match (self, src) {
             (Self::Rank1(target), Self::Rank1(s)) => {
                 Self::Rank1(B::scatter_add(&target, &s, axis, indices))
@@ -368,6 +367,14 @@ impl<B: Backend> GradValue<B> {
                 Self::Rank2(B::scatter_add(&target, &s, axis, indices))
             }
             _ => panic!("GradValue::scatter_add_at: rank mismatch"),
+        }
+    }
+
+    /// Gather along `axis` at `indices` (inverse of scatter_add for the src gradient).
+    pub fn gather_at(self, axis: usize, indices: &[usize]) -> Self {
+        match self {
+            Self::Rank1(t) => Self::Rank1(B::gather(&t, axis, indices)),
+            Self::Rank2(t) => Self::Rank2(B::gather(&t, axis, indices)),
         }
     }
 }
