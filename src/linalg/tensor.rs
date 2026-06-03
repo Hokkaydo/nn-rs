@@ -23,6 +23,13 @@ impl<B: Backend, const NDIM: usize> Tensor<B, NDIM> {
         B::tensor(data, shape)
     }
 
+    /// Creates a Tensor from an existing TensorId.
+    /// * `id` - The TensorId of the existing tensor_old.
+    /// Returns a new Tensor instance.
+    pub fn from_id(id: TensorId) -> Self {
+        Self { id, _backend: PhantomData }
+    }
+
     pub fn from_raw_parts(data: Vec<Scalar>, shape: [usize; NDIM], strides: [usize; NDIM]) -> Self {
         B::tensor_from_raw_parts(data, shape, strides)
     }
@@ -45,10 +52,6 @@ impl<B: Backend, const NDIM: usize> Tensor<B, NDIM> {
         let data_size = shape.iter().product();
         let data = vec![0.0; data_size];
         Self::new(data, shape)
-    }
-
-    pub fn from_scalar(value: Scalar) -> Tensor<B, NDIM> {
-        Self::new(vec![value; 1], [1; NDIM])
     }
 
     /// Computes the shape without dimensions of size one.
@@ -110,24 +113,6 @@ impl<B: Backend, const NDIM: usize> Tensor<B, NDIM> {
             flat_index += idx * strides[i];
         }
         flat_index
-    }
-
-    /// Removes a dimension of size one at the specified position.
-    /// # Arguments
-    /// * `axis` - The position of the dimension to remove.
-    /// # Returns
-    /// A new tensor with the specified dimension removed.
-    pub fn squeeze(&self, axis: usize) -> Tensor<B, { NDIM - 1 }> {
-        B::squeeze(self, axis)
-    }
-
-    /// Adds a dimension of size one at the specified position.
-    /// # Arguments
-    /// * `axis` - The position at which to add the new dimension.
-    /// # Returns
-    /// A new tensor with an added dimension of size one.
-    pub fn unsqueeze(&self, axis: usize) -> Tensor<B, { NDIM + 1 }> {
-        B::unsqueeze(self, axis)
     }
 
     /// Gets the value at the specified multidimensional indices.

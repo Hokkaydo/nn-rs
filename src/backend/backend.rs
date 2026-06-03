@@ -1,5 +1,4 @@
-use crate::linalg::tensor::{Scalar, Tensor};
-use std::fmt::Debug;
+use crate::linalg::tensor::{Scalar, Tensor, TensorId};
 
 pub trait ActivationOps<B: Backend> {
     fn sigmoid<const NDIM: usize>(tensor: &Tensor<B, NDIM>) -> Tensor<B, NDIM>;
@@ -97,6 +96,12 @@ pub trait ViewOps<B: Backend> {
         axis: usize,
         indices: &[usize],
     ) -> Tensor<B, NDIM>;
+    fn scatter_add<const NDMIM: usize>(
+        target: &Tensor<B, NDMIM>,
+        src: &Tensor<B, NDMIM>,
+        axis: usize,
+        indices: &[usize],
+    ) -> Tensor<B, NDMIM>;
 }
 
 pub trait TensorOps<B: Backend>:
@@ -110,19 +115,7 @@ pub trait TensorOps<B: Backend>:
     + MatMulOps<B>
     + ActivationOps<B>
 {
-}
 
-pub trait OptimizerOps<B: Backend> {
-    fn step<const NDIM: usize>(&mut self, params: Vec<&mut Tensor<B, NDIM>>, zero_grad: bool);
-    fn reset(&mut self) {}
-}
-
-pub trait InternalTensor<B: Backend>: Debug {
-    fn shape<const NDIM: usize>(&self) -> [usize; NDIM];
-    fn data(&self) -> Vec<Scalar>;
-    fn mut_data(&mut self) -> &mut Vec<Scalar>;
-    fn strides<const NDIM: usize>(&self) -> [usize; NDIM];
-    fn offset(&self) -> usize;
 }
 
 pub trait Backend: Default + Clone + TensorOps<Self> {
@@ -142,4 +135,7 @@ pub trait Backend: Default + Clone + TensorOps<Self> {
     fn strides<const NDIM: usize>(tensor: &Tensor<Self, NDIM>) -> [usize; NDIM];
     fn offset<const NDIM: usize>(tensor: &Tensor<Self, NDIM>) -> usize;
     fn internal_debug<const NDIM: usize>(tensor: &Tensor<Self, NDIM>) -> String;
+
+    /// Returns the shape of any tensor by ID without requiring a compile-time NDIM.
+    fn shape_dyn(id: TensorId) -> Vec<usize>;
 }

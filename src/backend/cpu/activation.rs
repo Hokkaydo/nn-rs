@@ -11,21 +11,42 @@ impl ActivationOps<Self> for CPUBackend {
 
     fn softmax<const NDIM: usize>(tensor: &Tensor<Self, NDIM>) -> Tensor<Self, NDIM> {
         let data = tensor.as_slice();
-        let max_val = data.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-        let exp_data: Vec<f32> = data.iter().map(|&x| (x - max_val).exp()).collect();
-        let sum_exp: f32 = exp_data.iter().sum();
-        let result_data: Vec<f32> = exp_data.iter().map(|&x| x / sum_exp).collect();
-        Tensor::new(result_data, tensor.shape())
+        let shape = tensor.shape();
+        let cols = shape[NDIM - 1];
+        let rows = data.len() / cols;
+
+        let mut result_data = vec![0.0f32; data.len()];
+        for r in 0..rows {
+            let row = &data[r * cols..(r + 1) * cols];
+            let max_val = row.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+            let exp_row: Vec<f32> = row.iter().map(|&x| (x - max_val).exp()).collect();
+            let sum_exp: f32 = exp_row.iter().sum();
+            for c in 0..cols {
+                result_data[r * cols + c] = exp_row[c] / sum_exp;
+            }
+        }
+
+        Tensor::new(result_data, shape)
     }
 
     fn log_softmax<const NDIM: usize>(tensor: &Tensor<Self, NDIM>) -> Tensor<Self, NDIM> {
         let data = tensor.as_slice();
-        let max_val = data.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-        let exp_data: Vec<f32> = data.iter().map(|&x| (x - max_val).exp()).collect();
-        let sum_exp: f32 = exp_data.iter().sum();
-        let log_sum_exp = sum_exp.ln();
-        let result_data: Vec<f32> = data.iter().map(|&x| x - max_val - log_sum_exp).collect();
-        Tensor::new(result_data, tensor.shape())
+        let shape = tensor.shape();
+        let cols = shape[NDIM - 1];
+        let rows = data.len() / cols;
+
+        let mut result_data = vec![0.0f32; data.len()];
+        for r in 0..rows {
+            let row = &data[r * cols..(r + 1) * cols];
+            let max_val = row.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+            let exp_row: Vec<f32> = row.iter().map(|&x| (x - max_val).exp()).collect();
+            let sum_exp: f32 = exp_row.iter().sum();
+            for c in 0..cols {
+                result_data[r * cols + c] = (exp_row[c] / sum_exp).ln();
+            }
+        }
+
+        Tensor::new(result_data, shape)
     }
 
     fn relu<const NDIM: usize>(tensor: &Tensor<Self, NDIM>) -> Tensor<Self, NDIM> {

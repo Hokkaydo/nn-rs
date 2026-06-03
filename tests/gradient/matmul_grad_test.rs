@@ -1,30 +1,27 @@
+use nn_rs::backend::autograd::Autograd;
+use nn_rs::backend::autograd::engine::ReverseMode;
+use nn_rs::backend::cpu::CPUBackend;
 use nn_rs::linalg::tensor::Tensor;
 
-#[cfg(test)]
+type AG = Autograd<CPUBackend>;
+
 #[test]
-fn test_matmul_grad() {
-    // Create two tensors with requires_grad = true
-    let a = Tensor::with_grad(vec![1.0, 2.0, 3.0, 4.0], &[2, 2]);
-    let b = Tensor::with_grad(vec![5.0, 6.0, 7.0, 8.0], &[2, 2]);
-
-    // Perform matrix multiplication
+fn test_matmul_22_grad() {
+    // a:[2,2] @ b:[2,2] to c:[2,2]
+    let a = Tensor::<AG, 2>::with_grad(vec![1.0, 2.0, 3.0, 4.0], [2, 2]);
+    let b = Tensor::<AG, 2>::with_grad(vec![5.0, 6.0, 7.0, 8.0], [2, 2]);
     let c = a.matmul(&b);
-
-    // Assume some loss function and compute gradient
     let loss = c.sum();
-    loss.backward();
+    loss.backward::<ReverseMode>();
 
-    // Check gradients
     let grad_a = a.grad().unwrap();
     let grad_b = b.grad().unwrap();
 
-    // Expected gradients
-    let expected_grad_a = [11.0, 15.0, 11.0, 15.0];
-    let expected_grad_b = [4.0, 4.0, 6.0, 6.0];
-    let expected_shape = &[2, 2];
-
-    assert_eq!(grad_a.shape(), expected_shape);
-    assert_eq!(grad_b.shape(), expected_shape);
-    assert_eq!(grad_a.as_slice(), &expected_grad_a);
-    assert_eq!(grad_b.as_slice(), &expected_grad_b);
+    // ∂L/∂a = ones @ b.T,  ∂L/∂b = a.T @ ones
+    let expected_ga = vec![11.0, 15.0, 11.0, 15.0];
+    let expected_gb = vec![4.0, 4.0, 6.0, 6.0];
+    assert_eq!(grad_a.shape(), [2, 2]);
+    assert_eq!(grad_b.shape(), [2, 2]);
+    assert_eq!(grad_a.as_slice(), expected_ga);
+    assert_eq!(grad_b.as_slice(), expected_gb);
 }

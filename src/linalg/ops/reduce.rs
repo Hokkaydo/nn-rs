@@ -66,13 +66,9 @@ impl<B: Backend, const NDIM: usize> Tensor<B, NDIM> {
     /// # Returns
     /// A vector containing the indices of the maximum values along the specified axis
     /// # Example
-    /// ```rust
+    /// ```rust,ignore
     /// use nn_rs::linalg::tensor::Tensor;
-    /// let tensor = Tensor::new(vec![4.0, 3.0, 6.0, 1.0, 5.0, 2.0], &vec![2, 3]);
-    /// // 4 3 6
-    /// // 1 5 2
-    /// assert_eq!(tensor.argmax(0), vec![0, 1, 0]); // Max values in each column are 4, 5, 6
-    /// assert_eq!(tensor.argmax(1), vec![2, 1]);    // Max values in each row are 6, 5
+    /// // See integration tests for usage examples
     /// ```
     pub fn argmax(&self, axis: usize) -> Tensor<B, { NDIM - 1 }> {
         assert!(axis <= NDIM, "Too many axes for argmax");

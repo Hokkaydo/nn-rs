@@ -29,6 +29,7 @@ pub trait Allocator {
 pub struct ArenaAllocator {
     tensors: Vec<InternalTensor>,
     next_id: TensorId,
+    generation_start: TensorId,
 }
 
 /// Computes the strides for a given shape. Strides are used to calculate the memory offset for each dimension.
@@ -43,6 +44,26 @@ fn compute_strides(shape: &[usize]) -> Vec<usize> {
         stride *= shape[i];
     }
     strides
+}
+
+impl ArenaAllocator {
+    /// Records the current allocation frontier as the start of a new generation.
+    /// Tensors allocated after this point (intermediates) can be freed together.
+    pub fn mark_generation_start(&mut self) -> TensorId {
+        self.generation_start = self.next_id;
+        self.next_id
+    }
+
+    /// Frees all tensors allocated after the last `mark_generation_start`.
+    /// Parameter tensors allocated before the mark are preserved.
+    pub fn truncate_to_generation(&mut self) {
+        self.tensors.truncate(self.generation_start);
+        self.next_id = self.generation_start;
+    }
+
+    pub fn shape_dyn(&self, id: TensorId) -> Option<Vec<usize>> {
+        self.tensors.get(id).map(|t| t.shape.clone())
+    }
 }
 
 impl Allocator for ArenaAllocator {

@@ -1,18 +1,19 @@
 import pandas as pd
-
+import numpy as np
 
 def csv_to_binary(input_csv, output_file):
-    df = pd.read_csv(input_csv)
-    # limit to 1000 rows for testing
+    df = pd.read_csv(input_csv).astype(np.uint8)
     df = df.head(1000)
-    size = df.shape[0]
-    with open(output_file, 'wb') as f:
-        f.write(size.to_bytes(4, byteorder='big'))
-        for index, row in df.iterrows():
-            # Write first byte as the label in big endian format
-            f.write(row[0:1].to_numpy().tobytes())
-            f.write(row[1:].to_numpy().tobytes())
 
+    with open(output_file, "wb") as f:
+        f.write(len(df).to_bytes(4, byteorder="big"))
+
+        for _, row in df.iterrows():
+            label = int(row[0])
+            pixels = row[1:].to_numpy(dtype=np.uint8)
+
+            f.write(label.to_bytes(1, "big"))
+            f.write(pixels.tobytes())
 
 if __name__ == "__main__":
     csv_to_binary("train.csv", "train.bin")

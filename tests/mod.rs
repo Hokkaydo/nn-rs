@@ -1,2 +1,2 @@
-// mod gradient;
+mod gradient;
 mod tensor;

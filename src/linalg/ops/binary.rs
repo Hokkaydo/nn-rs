@@ -186,7 +186,6 @@ impl<B: Backend, const NDIM: usize> Tensor<B, NDIM> {
     /// A new tensor containing the result of the broadcast addition
     pub fn broadcast_add<const BC_DIM: usize>(&self, other: &Tensor<B, BC_DIM>) -> Tensor<B, NDIM> {
         let broadcasted_other = B::broadcast(other, self.shape());
-        println!("Broadcasted {:?}", broadcasted_other);
         self + &broadcasted_other
     }
 }

@@ -1,131 +1,87 @@
-use crate::linalg::tensor::{Scalar, Tensor};
-use crate::nn::{Dumpable, Layer};
-use rand::Rng;
-use std::fs::File;
-use std::io::{BufReader, BufWriter, Read, Write};
+use std::io::{Read, Write};
 
-pub struct Linear {
-    weights: Tensor,
-    bias: Tensor,
+use crate::backend::autograd::Autograd;
+use crate::backend::backend::Backend;
+use crate::linalg::tensor::{Scalar, Tensor, TensorId};
+use rand::Rng;
+
+pub struct Linear<B: Backend> {
+    pub weights: Tensor<Autograd<B>, 2>,
+    pub bias: Tensor<Autograd<B>, 1>,
 }
 
-impl Linear {
-    pub fn init(n_inputs: usize, n_outputs: usize) -> Self {
-        // let fan_avg = (n_inputs + n_outputs) as Scalar / 2.0;
-        // let range = rand::distr::Uniform::new(-6.0 / fan_avg.sqrt(), 6.0 / fan_avg.sqrt()).unwrap();
-        let range = rand::distr::Uniform::new(
-            -6.0 / (n_inputs as Scalar).sqrt(),
-            6.0 / (n_inputs as Scalar).sqrt(),
-        )
-        .unwrap();
+impl<B: Backend> Linear<B> {
+    pub fn new(in_features: usize, out_features: usize) -> Self {
+        let bound = (1.0 / in_features as Scalar).sqrt();
+        let range = rand::distr::Uniform::new(-bound, bound).unwrap();
         let weights: Vec<Scalar> = rand::rng()
             .sample_iter(range)
-            .take(n_inputs * n_outputs)
+            .take(in_features * out_features)
             .collect();
-        let bias: Vec<Scalar> = rand::rng().sample_iter(range).take(n_outputs).collect();
-
-        let weights = Tensor::with_grad(weights, &[n_inputs, n_outputs]);
-        let bias = Tensor::with_grad(bias, &[1, n_outputs]);
-
-        Linear { weights, bias }
-    }
-
-    pub fn from_parameters(weights: Tensor, bias: Tensor) -> Self {
-        assert_eq!(weights.shape.len(), 2, "Weights must be a 2D tensor");
-        assert_eq!(bias.shape.len(), 2, "Bias must be a 2D tensor");
-        assert_eq!(bias.shape[0], 1, "Bias must have shape [1, n_outputs]");
-        assert_eq!(
-            weights.shape[1], bias.shape[1],
-            "Weights and bias output dimensions must match"
-        );
-        Linear { weights, bias }
+        let bias: Vec<Scalar> = rand::rng()
+            .sample_iter(range)
+            .take(out_features)
+            .collect();
+        Self {
+            weights: Tensor::with_grad(weights, [in_features, out_features]),
+            bias: Tensor::with_grad(bias, [out_features]),
+        }
     }
 }
 
-impl Dumpable for Linear {
-    fn dump(&self, file: &mut BufWriter<File>) {
-        let weights = &self.weights;
-        let bias = &self.bias;
-
-        let mut sizes = weights
-            .shape
-            .iter()
-            .flat_map(|&x| x.to_le_bytes())
-            .collect::<Vec<u8>>();
-        sizes.append(
-            &mut bias
-                .shape
-                .iter()
-                .flat_map(|&x| x.to_le_bytes())
-                .collect::<Vec<u8>>(),
-        );
-
-        file.write_all(&sizes)
-            .expect("Unable to write sizes to file");
-        file.write_all(
-            &weights
-                .storage
-                .data
-                .iter()
-                .flat_map(|&x| x.to_le_bytes())
-                .collect::<Vec<u8>>(),
-        )
-        .expect("Unable to write weights to file");
-        file.write_all(
-            &bias
-                .storage
-                .data
-                .iter()
-                .flat_map(|&x| x.to_le_bytes())
-                .collect::<Vec<u8>>(),
-        )
-        .expect("Unable to write bias to file");
-    }
-    fn restore(file: &mut BufReader<File>) -> Box<dyn Dumpable> {
-        let mut sizes = [0u8; 32]; // 4 * 8 bytes for 4 usize values
-        file.read_exact(&mut sizes)
-            .expect("Unable to read sizes from file");
-
-        let weights_shape = (
-            usize::from_le_bytes(sizes[0..8].try_into().unwrap()),
-            usize::from_le_bytes(sizes[8..16].try_into().unwrap()),
-        );
-        let bias_shape = (
-            usize::from_le_bytes(sizes[16..24].try_into().unwrap()),
-            usize::from_le_bytes(sizes[24..32].try_into().unwrap()),
-        );
-
-        let weights_size = weights_shape.0 * weights_shape.1;
-        let bias_size = bias_shape.1;
-
-        let mut weights_data = vec![0.0; weights_size];
-        let mut bias_data = vec![0.0; bias_size];
-
-        file.read_exact(bytemuck::cast_slice_mut(&mut weights_data))
-            .expect("Unable to read weights from file");
-        file.read_exact(bytemuck::cast_slice_mut(&mut bias_data))
-            .expect("Unable to read bias from file");
-
-        let weights = Tensor::with_grad(weights_data, &[weights_shape.0, weights_shape.1]);
-        let bias = Tensor::with_grad(bias_data, &[bias_shape.0, bias_shape.1]);
-
-        Box::new(Linear { weights, bias })
-    }
-    fn type_id() -> &'static str {
-        "linear"
-    }
-}
-
-impl Layer for Linear {
-    fn forward(&self, input: &Tensor) -> Tensor {
-        input.matmul(&self.weights).broadcast_add(&self.bias)
+impl<B: Backend> Linear<B> {
+    pub fn forward(&self, input: &Tensor<Autograd<B>, 2>) -> Tensor<Autograd<B>, 2> {
+        // input: [batch, in_features], weights: [in_features, out_features] to [batch, out_features]
+        let out = input.matmul(&self.weights);
+        // bias: [out_features] to broadcast to [batch, out_features]
+        out.broadcast_add(&self.bias)
     }
 
-    fn parameters(&self) -> Vec<&Tensor> {
-        vec![&self.weights, &self.bias]
+    pub fn parameters(&self) -> Vec<TensorId> {
+        vec![self.weights.id, self.bias.id]
     }
 
-    fn parameters_mut(&mut self) -> Vec<&mut Tensor> {
-        vec![&mut self.weights, &mut self.bias]
+    pub fn dump(&self, file: &mut std::io::BufWriter<std::fs::File>) {
+        // Write weights
+        let weights_data = self.weights.as_slice();
+        let weights_len = weights_data.len() as u32;
+        file.write_all(&weights_len.to_le_bytes()).unwrap();
+        for w in weights_data {
+            file.write_all(&w.to_le_bytes()).unwrap();
+        }
+        // Write bias
+        let bias_data = self.bias.as_slice();
+        let bias_len = bias_data.len() as u32;
+        file.write_all(&bias_len.to_le_bytes()).unwrap();
+        for b in bias_data {
+            file.write_all(&b.to_le_bytes()).unwrap();
+        }
+    }
+
+    pub fn restore(file: &mut std::io::BufReader<std::fs::File>) -> Self {
+        // Read weights
+        let mut weights_len_bytes = [0u8; 4];
+        file.read_exact(&mut weights_len_bytes).unwrap();
+        let weights_len = u32::from_le_bytes(weights_len_bytes) as usize;
+        let mut weights_data = vec![0f32; weights_len];
+        for w in &mut weights_data {
+            let mut w_bytes = [0u8; 4];
+            file.read_exact(&mut w_bytes).unwrap();
+            *w = f32::from_le_bytes(w_bytes);
+        }
+        // Read bias
+        let mut bias_len_bytes = [0u8; 4];
+        file.read_exact(&mut bias_len_bytes).unwrap();
+        let bias_len = u32::from_le_bytes(bias_len_bytes) as usize;
+        let mut bias_data = vec![0f32; bias_len];
+        for b in &mut bias_data {
+            let mut b_bytes = [0u8; 4];
+            file.read_exact(&mut b_bytes).unwrap();
+            *b = f32::from_le_bytes(b_bytes);
+        }
+        Self {
+            weights: Tensor::with_grad(weights_data, [weights_len / bias_len, bias_len]),
+            bias: Tensor::with_grad(bias_data, [bias_len]),
+        }
     }
 }

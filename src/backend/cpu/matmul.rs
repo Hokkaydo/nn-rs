@@ -6,69 +6,78 @@ impl MatMulOps<Self> for CPUBackend {
     fn matmul_11(a: &Tensor<Self, 1>, b: &Tensor<Self, 1>) -> Tensor<Self, 1> {
         let a_shape = a.shape();
         let b_shape = b.shape();
-        assert_eq!(
-            a_shape[0], b_shape[0],
-            "Incompatible shapes for matmul: {:?} and {:?}",
-            a_shape, b_shape
-        );
-        let mut result_data = vec![0.0; 1];
+        assert_eq!(a_shape[0], b_shape[0], "matmul_11 shape mismatch: {:?} vs {:?}", a_shape, b_shape);
+        let a_data = a.as_slice();
+        let b_data = b.as_slice();
+        let a_s = a.strides();
+        let b_s = b.strides();
+        let a_off = a.offset();
+        let b_off = b.offset();
+        let mut dot = 0.0f32;
         for i in 0..a_shape[0] {
-            result_data[0] += a.as_slice()[i] * b.as_slice()[i];
+            dot += a_data[a_off + i * a_s[0]] * b_data[b_off + i * b_s[0]];
         }
-        Tensor::new(result_data, [1])
+        Tensor::new(vec![dot], [1])
     }
 
     fn matmul_12(a: &Tensor<Self, 1>, b: &Tensor<Self, 2>) -> Tensor<Self, 1> {
         let a_shape = a.shape();
         let b_shape = b.shape();
-        assert_eq!(
-            a_shape[0], b_shape[0],
-            "Incompatible shapes for matmul: {:?} and {:?}",
-            a_shape, b_shape
-        );
-        let mut result_data = vec![0.0; b_shape[1]];
+        assert_eq!(a_shape[0], b_shape[0], "matmul_12 shape mismatch: {:?} vs {:?}", a_shape, b_shape);
+        let a_data = a.as_slice();
+        let b_data = b.as_slice();
+        let a_s = a.strides();
+        let b_s = b.strides();
+        let a_off = a.offset();
+        let b_off = b.offset();
+        let mut result = vec![0.0f32; b_shape[1]];
         for j in 0..b_shape[1] {
             for i in 0..a_shape[0] {
-                result_data[j] += a.as_slice()[i] * b.as_slice()[i * b_shape[1] + j];
+                result[j] += a_data[a_off + i * a_s[0]] * b_data[b_off + i * b_s[0] + j * b_s[1]];
             }
         }
-        Tensor::new(result_data, [b_shape[1]])
+        Tensor::new(result, [b_shape[1]])
     }
 
     fn matmul_21(a: &Tensor<Self, 2>, b: &Tensor<Self, 1>) -> Tensor<Self, 1> {
         let a_shape = a.shape();
         let b_shape = b.shape();
-        assert_eq!(
-            a_shape[1], b_shape[0],
-            "Incompatible shapes for matmul: {:?} and {:?}",
-            a_shape, b_shape
-        );
-        let mut result_data = vec![0.0; a_shape[0]];
+        assert_eq!(a_shape[1], b_shape[0], "matmul_21 shape mismatch: {:?} vs {:?}", a_shape, b_shape);
+        let a_data = a.as_slice();
+        let b_data = b.as_slice();
+        let a_s = a.strides();
+        let b_s = b.strides();
+        let a_off = a.offset();
+        let b_off = b.offset();
+        let mut result = vec![0.0f32; a_shape[0]];
         for i in 0..a_shape[0] {
             for j in 0..a_shape[1] {
-                result_data[i] += a.as_slice()[i * a_shape[1] + j] * b.as_slice()[j];
+                result[i] += a_data[a_off + i * a_s[0] + j * a_s[1]] * b_data[b_off + j * b_s[0]];
             }
         }
-        Tensor::new(result_data, [a_shape[0]])
+        Tensor::new(result, [a_shape[0]])
     }
 
     fn matmul_22(a: &Tensor<Self, 2>, b: &Tensor<Self, 2>) -> Tensor<Self, 2> {
         let a_shape = a.shape();
         let b_shape = b.shape();
-        assert_eq!(
-            a_shape[1], b_shape[0],
-            "Incompatible shapes for matmul: {:?} and {:?}",
-            a_shape, b_shape
-        );
-        let mut result_data = vec![0.0; a_shape[0] * b_shape[1]];
+        assert_eq!(a_shape[1], b_shape[0], "matmul_22 shape mismatch: {:?} vs {:?}", a_shape, b_shape);
+        let a_data = a.as_slice();
+        let b_data = b.as_slice();
+        let a_s = a.strides();
+        let b_s = b.strides();
+        let a_off = a.offset();
+        let b_off = b.offset();
+        let mut result = vec![0.0f32; a_shape[0] * b_shape[1]];
         for i in 0..a_shape[0] {
             for j in 0..b_shape[1] {
                 for k in 0..a_shape[1] {
-                    result_data[i * b_shape[1] + j] +=
-                        a.as_slice()[i * a_shape[1] + k] * b.as_slice()[k * b_shape[1] + j];
+                    result[i * b_shape[1] + j] +=
+                        a_data[a_off + i * a_s[0] + k * a_s[1]]
+                            * b_data[b_off + k * b_s[0] + j * b_s[1]];
                 }
             }
         }
-        Tensor::new(result_data, [a_shape[0], b_shape[1]])
+        Tensor::new(result, [a_shape[0], b_shape[1]])
     }
 }

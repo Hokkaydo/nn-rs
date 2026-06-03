@@ -68,4 +68,41 @@ impl ViewOps<Self> for CPUBackend {
         }
         Tensor::new(result_data, new_shape)
     }
+
+    fn scatter_add<const NDIM: usize>(
+        target: &Tensor<Self, NDIM>,
+        src: &Tensor<Self, NDIM>,
+        axis: usize,
+        indices: &[usize],
+    ) -> Tensor<Self, NDIM> {
+        assert!(axis < NDIM, "Axis out of bounds");
+        let target_shape = target.shape();
+        let src_shape = src.shape();
+        let src_data = src.as_slice();
+
+        let mut result_data = target.as_slice();
+        let src_total: usize = src_shape.iter().product();
+
+        let mut multi_indices = vec![0usize; NDIM];
+        for i in 0..src_total {
+            let mut idx = i;
+            for d in (0..NDIM).rev() {
+                multi_indices[d] = idx % src_shape[d];
+                idx /= src_shape[d];
+            }
+            let target_axis_idx = indices[multi_indices[axis]];
+            assert!(
+                target_axis_idx < target_shape[axis],
+                "scatter_add index out of bounds"
+            );
+            let mut target_multi = multi_indices.clone();
+            target_multi[axis] = target_axis_idx;
+            let flat_target: usize = target_multi
+                .iter()
+                .zip(target_shape.iter())
+                .fold(0, |acc, (&i, &dim)| acc * dim + i);
+            result_data[flat_target] += src_data[i];
+        }
+        Tensor::new(result_data, target_shape)
+    }
 }

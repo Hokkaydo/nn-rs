@@ -31,12 +31,21 @@ impl<B: Backend, const NDIM: usize> Tensor<B, NDIM> {
         B::reshape(self, shape)
     }
 
-    // /*Adds a dimension of size one at the specified position.
-    // # Arguments
-    // * `axis` - The position at which to add the new dimension.
-    // # Returns
-    // A new tensor with an added*/ dimension of size one.
-    // pub(crate) fn unsqueeze(&self, axis: usize) -> Tensor<B, { NDIM + 1 }> {
-    //     B::unsqueeze(self, axis)
-    // }
+    /// Removes a dimension of size one at the specified position.
+    /// # Arguments
+    /// * `axis` - The position of the dimension to remove.
+    /// # Returns
+    /// A new tensor with the specified dimension removed.
+    pub fn squeeze(&self, axis: usize) -> Tensor<B, { NDIM - 1 }> {
+        B::squeeze(self, axis)
+    }
+
+    /// Adds a dimension of size one at the specified position.
+    /// # Arguments
+    /// * `axis` - The position at which to add the new dimension.
+    /// # Returns
+    /// A new tensor with an added dimension of size one.
+    pub fn unsqueeze(&self, axis: usize) -> Tensor<B, { NDIM + 1 }> {
+        B::unsqueeze(self, axis)
+    }
 }

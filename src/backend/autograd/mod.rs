@@ -1,204 +1,110 @@
-mod activation;
-mod binary;
-mod engine;
-mod matmul;
-mod reduction;
-mod shape;
-mod unary;
-mod view;
+mod ops;
+pub mod engine;
 
 use crate::backend::backend::{
-    ActivationOps, Backend, BinaryOps, MatMulOps, ReductionOps, ReverseScalarOps, ScalarOps,
-    ShapeOps, TensorOps, UnaryOps, ViewOps,
+    Backend, TensorOps,
 };
 use crate::linalg::tensor::{Scalar, Tensor, TensorId};
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::marker::PhantomData;
+use crate::backend::autograd::engine::AutogradStrategy;
 
 #[derive(Clone)]
 pub struct Autograd<B: Backend> {
     _backend: PhantomData<B>,
 }
 
-enum GradOp {
+#[derive(Clone)]
+pub struct GradNode {
+    pub input_ids: Vec<TensorId>,
+    pub inputs_ndims: Vec<usize>,
+    pub output_id: TensorId,
+    pub output_ndim: usize,
+    pub grad_op: GradOp
+}
+
+#[derive(Clone)]
+pub enum GradOp {
     // Unary operations
-    Neg {
-        input_id: TensorId,
-        output_id: TensorId,
-    },
-    Pow {
-        input_id: TensorId,
-        exponent: Scalar,
-        output_id: TensorId,
-    },
-    Exp {
-        input_id: TensorId,
-        output_id: TensorId,
-    },
-    Log {
-        input_id: TensorId,
-        output_id: TensorId,
-    },
-    Abs {
-        input_id: TensorId,
-        output_id: TensorId,
-    },
-    Sign {
-        input_id: TensorId,
-        output_id: TensorId,
-    },
-    Clamp {
-        input_id: TensorId,
-        min: Scalar,
-        max: Scalar,
-        output_id: TensorId,
-    },
+    Neg,
+    Pow { exponent: Scalar },
+    Exp,
+    Log,
+    Abs,
+    Sign,
+    Clamp { min: Scalar, max: Scalar },
 
     // Binary operations
-    Add {
-        input_ids: Vec<TensorId>,
-        output_id: TensorId,
-    },
-    AddScalar {
-        input_id: TensorId,
-        scalar: Scalar,
-        output_id: TensorId,
-    },
-    Sub {
-        input_ids: Vec<TensorId>,
-        output_id: TensorId,
-    },
-    SubScalar {
-        input_id: TensorId,
-        scalar: Scalar,
-        output_id: TensorId,
-    },
-    ScalarSub {
-        scalar: Scalar,
-        input_id: TensorId,
-        output_id: TensorId,
-    },
-    Mul {
-        input_ids: Vec<TensorId>,
-        output_id: TensorId,
-    },
-    MulScalar {
-        input_id: TensorId,
-        scalar: Scalar,
-        output_id: TensorId,
-    },
-    Div {
-        input_ids: Vec<TensorId>,
-        output_id: TensorId,
-    },
-    DivScalar {
-        input_id: TensorId,
-        scalar: Scalar,
-        output_id: TensorId,
-    },
-    ScalarDiv {
-        scalar: Scalar,
-        input_id: TensorId,
-        output_id: TensorId,
-    },
-    MatMul {
-        input_ids: Vec<TensorId>,
-        output_id: TensorId,
-    },
+    Add,
+    AddScalar { scalar: Scalar },
+    Sub,
+    SubScalar { scalar: Scalar },
+    ScalarSub { scalar: Scalar },
+    Mul,
+    MulScalar { scalar: Scalar },
+    Div,
+    DivScalar { scalar: Scalar },
+    ScalarDiv { scalar: Scalar },
+    MatMul,
 
     // Reduction operations
-    Sum {
-        input_id: TensorId,
-        output_id: TensorId,
-        axes: Option<Vec<usize>>,
-    },
-    Mean {
-        input_id: TensorId,
-        output_id: TensorId,
-        axes: Option<Vec<usize>>,
-    },
-    Max {
-        input_id: TensorId,
-        output_id: TensorId,
-        axes: Option<Vec<usize>>,
-    },
-    Min {
-        input_id: TensorId,
-        output_id: TensorId,
-        axes: Option<Vec<usize>>,
-    },
+    Sum { axes: Option<Vec<usize>>, },
+    Mean { axes: Option<Vec<usize>>, },
+    Max { axes: Option<Vec<usize>>, },
+    Min { axes: Option<Vec<usize>>, },
 
     // Shape operations
-    Reshape {
-        input_id: TensorId,
-        output_id: TensorId,
-        new_shape: Vec<usize>,
-    },
-    Transpose {
-        input_id: TensorId,
-        output_id: TensorId,
-        axes: Option<Vec<usize>>,
-    },
-    Squeeze {
-        input_id: TensorId,
-        output_id: TensorId,
-        new_shape: Vec<usize>,
-        axis: usize,
-    },
-    Unsqueeze {
-        input_id: TensorId,
-        output_id: TensorId,
-        axis: usize,
-    },
-    Broadcast {
-        input_id: TensorId,
-        output_id: TensorId,
-        new_shape: Vec<usize>,
-    },
+    Reshape { new_shape: Vec<usize>, },
+    Transpose { axes: Option<Vec<usize>>, },
+    Squeeze { new_shape: Vec<usize>, axis: usize, },
+    Unsqueeze { axis: usize, },
+    Broadcast { new_shape: Vec<usize>, },
 
     // View operations
-    Slice {
-        input_id: TensorId,
-        output_id: TensorId,
-        axis: usize,
-        start: usize,
-        len: usize,
-    },
-    Gather {
-        input_id: TensorId,
-        output_id: TensorId,
-        axis: usize,
-        indices: Vec<usize>,
-    },
+    Slice { axis: usize, start: usize, len: usize, },
+    Gather { axis: usize, indices: Vec<usize>, },
+    ScatterAdd { axis: usize, indices: Vec<usize>, },
 
     // Activation functions
-    Sigmoid {
-        input_id: TensorId,
-        output_id: TensorId,
-    },
-    ReLU {
-        input_id: TensorId,
-        output_id: TensorId,
-    },
-    Softmax {
-        input_id: TensorId,
-        output_id: TensorId,
-    },
-    LogSoftmax {
-        input_id: TensorId,
-        output_id: TensorId,
-    },
+    Sigmoid,
+    ReLU,
+    Softmax,
+    LogSoftmax,
 }
 
 thread_local! {
-    static AUTOGRAD_TAPE: RefCell<Vec<GradOp>> = RefCell::new(Vec::new());
+    static AUTOGRAD_TAPE: RefCell<Vec<GradNode>> = RefCell::new(Vec::new());
+    static REQUIRES_GRAD: RefCell<HashMap<TensorId, bool>> = RefCell::new(HashMap::new());
+    /// Maps parameter TensorId to gradient TensorId after backward().
+    static GRAD_STORAGE: RefCell<HashMap<TensorId, TensorId>> = RefCell::new(HashMap::new());
+}
+
+/// Clears the current tape and gradient storage. Call between training steps.
+pub fn clear_tape() {
+    AUTOGRAD_TAPE.with(|t| t.borrow_mut().clear());
+}
+
+pub fn clear_grad_storage() {
+    GRAD_STORAGE.with(|s| s.borrow_mut().clear());
 }
 
 impl<B: Backend> Autograd<B> {
-    fn record_op(op: GradOp) {
+    pub(crate) fn record_op(node: GradNode) {
         AUTOGRAD_TAPE.with(|tape| {
-            tape.borrow_mut().push(op);
+            tape.borrow_mut().push(node);
         });
+    }
+
+    fn tensor_with_grad<const NDIM: usize>(data: Vec<Scalar>, shape: [usize; NDIM]) -> Tensor<Self, NDIM> {
+        let registered = B::tensor(data, shape);
+        REQUIRES_GRAD.with(|list| {
+            list.borrow_mut().insert(registered.id, true);
+        });
+        Tensor::<Self, NDIM> {
+            id: registered.id,
+            _backend: PhantomData,
+        }
     }
 }
 
@@ -207,6 +113,34 @@ impl<B: Backend> Default for Autograd<B> {
         Autograd {
             _backend: PhantomData,
         }
+    }
+}
+
+impl<B: Backend, const NDIM: usize> Tensor<Autograd<B>, NDIM> {
+    pub fn backward<S: AutogradStrategy>(&self) {
+        REQUIRES_GRAD.with(|list| {
+            let requires_grad = list.borrow();
+            AUTOGRAD_TAPE.with(|tape| {
+                S::backward(self, tape.borrow().clone(), requires_grad.clone());
+            })
+        })
+    }
+
+    /// Returns the gradient of this tensor after backward(), or None if not computed.
+    pub fn grad(&self) -> Option<Tensor<Autograd<B>, NDIM>> {
+        GRAD_STORAGE.with(|s| {
+            s.borrow().get(&self.id).map(|&grad_id| Tensor::from_id(grad_id))
+        })
+    }
+
+    /// Removes the stored gradient for this tensor.
+    pub fn zero_grad(&self) {
+        GRAD_STORAGE.with(|s| { s.borrow_mut().remove(&self.id); });
+    }
+
+    /// Creates a tensor that requires gradient tracking.
+    pub fn with_grad(data: Vec<Scalar>, shape: [usize; NDIM]) -> Self {
+        Autograd::<B>::tensor_with_grad(data, shape)
     }
 }
 
@@ -246,6 +180,9 @@ impl<B: Backend> Backend for Autograd<B> {
 
     fn tensor<const NDIM: usize>(data: Vec<Scalar>, shape: [usize; NDIM]) -> Tensor<Self, NDIM> {
         let registered = B::tensor(data, shape);
+        REQUIRES_GRAD.with(|list| {
+            list.borrow_mut().insert(registered.id, false);
+        });
         Tensor::<Self, NDIM> {
             id: registered.id,
             _backend: PhantomData,
@@ -290,4 +227,21 @@ impl<B: Backend> Backend for Autograd<B> {
     fn internal_debug<const NDIM: usize>(tensor: &Tensor<Self, NDIM>) -> String {
         B::internal_debug(&tensor.into())
     }
+
+    fn shape_dyn(id: TensorId) -> Vec<usize> {
+        B::shape_dyn(id)
+    }
+}
+
+/// Writes computed gradients into GRAD_STORAGE. Called by the backward engine.
+pub(crate) fn store_grad(param_id: TensorId, grad_id: TensorId) {
+    GRAD_STORAGE.with(|s| { s.borrow_mut().insert(param_id, grad_id); });
+}
+
+pub(crate) fn get_requires_grad(id: TensorId) -> bool {
+    REQUIRES_GRAD.with(|r| r.borrow().get(&id).copied().unwrap_or(false))
+}
+
+pub fn get_grad_id(param_id: TensorId) -> Option<TensorId> {
+    GRAD_STORAGE.with(|s| s.borrow().get(&param_id).copied())
 }

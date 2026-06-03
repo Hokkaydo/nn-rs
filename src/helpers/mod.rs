@@ -1,6 +1,4 @@
-// pub mod metrics;
-// pub mod optimizer;
-// pub mod stopper;
+pub mod stopper;
 
 pub fn broadcast_dimensions<const NDIM: usize>(
     shape_a: &[usize; NDIM],

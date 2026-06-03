@@ -102,12 +102,3 @@ fn test_is_scalar() {
     let tensor = Tensor::<CPUBackend, 2>::new(data, [2, 1]);
     assert!(!tensor.is_scalar());
 }
-
-#[cfg(test)]
-#[test]
-fn test_from_scalar() {
-    let scalar_value = 7.0;
-    let tensor = Tensor::<CPUBackend, 2>::from_scalar(scalar_value);
-    assert_eq!(tensor.shape(), [1, 1]);
-    assert_eq!(tensor.get([0, 0]), scalar_value);
-}

@@ -1,4 +1,4 @@
-use crate::backend::backend::{Backend, UnaryOps};
+use crate::backend::backend::Backend;
 use crate::linalg::tensor::{Scalar, Tensor};
 use std::ops::Neg;
 

@@ -1,87 +1,57 @@
+use crate::backend::autograd::Autograd;
+use crate::backend::backend::Backend;
 use crate::linalg::tensor::Tensor;
-use crate::nn::{Dumpable, Layer};
-use std::fs::File;
-use std::io::BufReader;
+use crate::nn::Layer;
 
-#[derive(Default)]
-pub struct ReLU {}
-
-impl Dumpable for ReLU {
-    fn restore(_reader: &mut BufReader<File>) -> Box<dyn Dumpable>
-    where
-        Self: Sized,
-    {
-        Box::new(ReLU {})
-    }
-    fn type_id() -> &'static str {
-        "relu"
-    }
+pub struct ReLU<B: Backend> { 
+    _marker: std::marker::PhantomData<B>,
+}
+pub struct Sigmoid<B: Backend> { 
+    _marker: std::marker::PhantomData<B>,
+}
+pub struct Softmax<B: Backend> { 
+    _marker: std::marker::PhantomData<B>,
+}
+pub struct LogSoftmax<B: Backend> { 
+    _marker: std::marker::PhantomData<B>,
 }
 
-impl Layer for ReLU {
-    fn forward(&self, input: &Tensor) -> Tensor {
+impl<B: Backend> ReLU<B> {
+    pub fn forward(&self, input: &Tensor<Autograd<B>, 2>) -> Tensor<Autograd<B>, 2> {
         input.relu()
     }
-}
 
-#[derive(Default)]
-pub struct LogSoftmax;
-
-impl Dumpable for LogSoftmax {
-    fn restore(_reader: &mut BufReader<File>) -> Box<dyn Dumpable>
-    where
-        Self: Sized,
-    {
-        Box::new(LogSoftmax {})
-    }
-    fn type_id() -> &'static str {
-        "log_softmax"
+    pub fn new() -> Self {
+        Self { _marker: std::marker::PhantomData }
     }
 }
 
-impl Layer for LogSoftmax {
-    fn forward(&self, input: &Tensor) -> Tensor {
-        input.log_softmax()
+impl<B: Backend> Sigmoid<B> {
+    pub fn forward(&self, input: &Tensor<Autograd<B>, 2>) -> Tensor<Autograd<B>, 2> {
+        input.sigmoid()
+    }
+
+    pub fn new() -> Self {
+        Self { _marker: std::marker::PhantomData }
     }
 }
 
-#[derive(Default)]
-pub struct Softmax;
-
-impl Dumpable for Softmax {
-    fn restore(_reader: &mut BufReader<File>) -> Box<dyn Dumpable>
-    where
-        Self: Sized,
-    {
-        Box::new(Softmax {})
-    }
-    fn type_id() -> &'static str {
-        "softmax"
-    }
-}
-
-impl Layer for Softmax {
-    fn forward(&self, input: &Tensor) -> Tensor {
+impl<B: Backend> Softmax<B> {
+    pub fn forward(&self, input: &Tensor<Autograd<B>, 2>) -> Tensor<Autograd<B>, 2> {
         input.softmax()
     }
-}
 
-#[derive(Default)]
-pub struct Sigmoid;
-impl Dumpable for Sigmoid {
-    fn restore(_reader: &mut BufReader<File>) -> Box<dyn Dumpable>
-    where
-        Self: Sized,
-    {
-        Box::new(Sigmoid {})
-    }
-    fn type_id() -> &'static str {
-        "sigmoid"
+    pub fn new() -> Self {
+        Self { _marker: std::marker::PhantomData }
     }
 }
 
-impl Layer for Sigmoid {
-    fn forward(&self, input: &Tensor) -> Tensor {
-        input.sigmoid()
+impl<B: Backend> LogSoftmax<B> {
+    pub fn forward(&self, input: &Tensor<Autograd<B>, 2>) -> Tensor<Autograd<B>, 2> {
+        input.log_softmax()
+    }
+
+    pub fn new() -> Self {
+        Self { _marker: std::marker::PhantomData }
     }
 }

@@ -1,4 +1,4 @@
-use crate::backend::autograd::{Autograd, GradOp};
+use crate::backend::autograd::{Autograd, GradNode, GradOp};
 use crate::backend::backend::{Backend, ShapeOps};
 use crate::linalg::tensor::Tensor;
 
@@ -8,10 +8,12 @@ impl<B: Backend> ShapeOps<Self> for Autograd<B> {
         new_shape: [usize; NDIM],
     ) -> Tensor<Self, NDIM> {
         let result = B::reshape(&tensor.into(), new_shape);
-        Self::record_op(GradOp::Reshape {
-            input_id: tensor.id,
+        Self::record_op(GradNode {
+            grad_op: GradOp::Reshape { new_shape: new_shape.to_vec() },
+            input_ids: vec![tensor.id],
+            inputs_ndims: vec![NDIM],
             output_id: result.id,
-            new_shape: new_shape.to_vec(),
+            output_ndim: NDIM,
         });
         result.into()
     }
@@ -21,10 +23,12 @@ impl<B: Backend> ShapeOps<Self> for Autograd<B> {
         axes: Option<[usize; NDIM]>,
     ) -> Tensor<Self, NDIM> {
         let result = B::transpose(&tensor.into(), axes);
-        Self::record_op(GradOp::Transpose {
-            input_id: tensor.id,
+        Self::record_op(GradNode {
+            grad_op: GradOp::Transpose { axes: axes.map(|a| a.to_vec()) },
+            input_ids: vec![tensor.id],
+            inputs_ndims: vec![NDIM],
             output_id: result.id,
-            axes: axes.map(|a| a.to_vec()),
+            output_ndim: NDIM,
         });
         result.into()
     }
@@ -34,11 +38,12 @@ impl<B: Backend> ShapeOps<Self> for Autograd<B> {
         axis: usize,
     ) -> Tensor<Self, { NDIM - 1 }> {
         let result = B::squeeze(&tensor.into(), axis);
-        Self::record_op(GradOp::Squeeze {
-            input_id: tensor.id,
+        Self::record_op(GradNode {
+            grad_op: GradOp::Squeeze { new_shape: B::shape(&result).to_vec(), axis},
+            input_ids: vec![tensor.id],
+            inputs_ndims: vec![NDIM],
             output_id: result.id,
-            new_shape: B::shape(&result).to_vec(),
-            axis,
+            output_ndim: NDIM - 1,
         });
         result.into()
     }
@@ -48,10 +53,12 @@ impl<B: Backend> ShapeOps<Self> for Autograd<B> {
         axis: usize,
     ) -> Tensor<Self, { NDIM + 1 }> {
         let result = B::unsqueeze(&tensor.into(), axis);
-        Self::record_op(GradOp::Unsqueeze {
-            input_id: tensor.id,
+        Self::record_op(GradNode {
+            grad_op: GradOp::Unsqueeze { axis },
+            input_ids: vec![tensor.id],
+            inputs_ndims: vec![NDIM],
             output_id: result.id,
-            axis,
+            output_ndim: NDIM + 1,
         });
         result.into()
     }
@@ -61,10 +68,12 @@ impl<B: Backend> ShapeOps<Self> for Autograd<B> {
         new_shape: [usize; NEW_NDIM],
     ) -> Tensor<Self, NEW_NDIM> {
         let result = B::broadcast(&tensor.into(), new_shape);
-        Self::record_op(GradOp::Broadcast {
-            input_id: tensor.id,
+        Self::record_op(GradNode {
+            grad_op: GradOp::Broadcast { new_shape: new_shape.to_vec() },
+            input_ids: vec![tensor.id],
+            inputs_ndims: vec![OLD_NDIM],
             output_id: result.id,
-            new_shape: new_shape.to_vec(),
+            output_ndim: NEW_NDIM,
         });
         result.into()
     }

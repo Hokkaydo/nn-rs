@@ -11,8 +11,34 @@ use crate::backend::backend::{
     ActivationOps, Backend, BinaryOps, MatMulOps, ReductionOps, ReverseScalarOps, ScalarOps,
     ShapeOps, TensorOps, UnaryOps, ViewOps,
 };
-use crate::linalg::tensor::{Scalar, Tensor};
+use crate::linalg::tensor::{Scalar, Tensor, TensorId};
 use std::cell::RefCell;
+
+pub fn mark_generation_start() -> TensorId {
+    ALLOCATOR.with(|a| a.borrow_mut().mark_generation_start())
+}
+
+pub fn truncate_to_generation() {
+    ALLOCATOR.with(|a| a.borrow_mut().truncate_to_generation())
+}
+
+pub fn shape_dyn_raw(id: TensorId) -> Vec<usize> {
+    ALLOCATOR.with(|a| a.borrow().shape_dyn(id).expect("Tensor not found in allocator"))
+}
+
+pub fn data_by_id(id: TensorId) -> Vec<crate::linalg::tensor::Scalar> {
+    ALLOCATOR.with(|a| a.borrow().data(id).expect("Tensor not found").to_vec())
+}
+
+pub fn with_mut_data_by_id<F: FnOnce(&mut [crate::linalg::tensor::Scalar])>(id: TensorId, f: F) {
+    ALLOCATOR.with(|a| {
+        if let Some(data) = a.borrow_mut().data_mut(id) {
+            f(data);
+        } else {
+            panic!("Tensor not found: id={id}");
+        }
+    });
+}
 
 #[derive(Clone, Default)]
 pub struct CPUBackend;
@@ -106,6 +132,10 @@ impl Backend for CPUBackend {
                 .offset(tensor.id)
                 .expect("Tensor not found")
         })
+    }
+
+    fn shape_dyn(id: TensorId) -> Vec<usize> {
+        shape_dyn_raw(id)
     }
 
     fn internal_debug<const NDIM: usize>(tensor: &Tensor<CPUBackend, NDIM>) -> String {
