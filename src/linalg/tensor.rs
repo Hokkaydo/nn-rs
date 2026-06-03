@@ -1,54 +1,44 @@
-use crate::linalg::autograd::grad_fn::GradFn;
-use std::cell::RefCell;
+use crate::backend::backend::Backend;
 use std::fmt::Debug;
-use std::ops::Deref;
-use std::rc::Rc;
+use std::marker::PhantomData;
 
 pub(crate) type Scalar = f32;
+pub type TensorId = usize;
 
-/// Internal storage for tensor_old data. Allows multiple tensors to share the same data.
 #[derive(Clone)]
-pub(crate) struct Storage {
-    pub(crate) data: Vec<Scalar>,
-}
-impl Storage {
-    /// Creates a new Storage with the given data.
-    /// * `data` - A vector containing the storage data.
-    pub(crate) fn new(data: Vec<Scalar>) -> Self {
-        Storage { data }
-    }
+pub struct Tensor<B: Backend, const NDIM: usize> {
+    pub id: TensorId,
+    pub(crate) _backend: PhantomData<B>,
 }
 
-/// A multidimensional array (tensor) that supports automatic differentiation.
-/// This wrapper struct holds a reference-counted pointer to the internal tensor representation,
-/// allowing for efficient sharing and cloning of tensor data.
-#[derive(Clone)]
-pub struct Tensor(pub(crate) Rc<InternalTensor>);
-
-impl Deref for Tensor {
-    type Target = Rc<InternalTensor>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl From<InternalTensor> for Tensor {
-    fn from(internal: InternalTensor) -> Self {
-        Tensor(Rc::new(internal))
-    }
-}
-
-impl Tensor {
+impl<B: Backend, const NDIM: usize> Tensor<B, NDIM> {
     /// Creates a new Tensor with the given data and shape.
-    pub fn new(data: Vec<Scalar>, shape: &[usize]) -> Self {
-        InternalTensor::new(data, shape).into()
+    pub fn new(data: Vec<Scalar>, shape: [usize; NDIM]) -> Self {
+        assert_eq!(
+            shape.len(),
+            NDIM,
+            "Shape length must match tensor dimension"
+        );
+        assert_eq!(data.len(), shape.iter().product());
+        B::tensor(data, shape)
     }
 
-    /// Creates a tensor_old filled with ones with the specified shape.
+    /// Creates a Tensor from an existing TensorId.
+    /// * `id` - The TensorId of the existing tensor_old.
+    /// Returns a new Tensor instance.
+    pub fn from_id(id: TensorId) -> Self {
+        Self { id, _backend: PhantomData }
+    }
+
+    pub fn from_raw_parts(data: Vec<Scalar>, shape: [usize; NDIM], strides: [usize; NDIM]) -> Self {
+        B::tensor_from_raw_parts(data, shape, strides)
+    }
+
+    /// Creates a tensor_old filled with ones wTensorType = Tensor<B, NDIM>ith the specified shape.
     /// * `shape` - A slice representing the shape of the tensor_old.
     ///
     /// Returns a new tensor_old filled with ones.
-    pub fn ones(shape: &[usize]) -> Self {
+    pub fn ones(shape: [usize; NDIM]) -> Self {
         let data_size = shape.iter().product();
         let data = vec![1.0; data_size];
         Self::new(data, shape)
@@ -58,24 +48,10 @@ impl Tensor {
     /// * `shape` - A slice representing the shape of the tensor_old.
     ///
     /// Returns a new tensor_old filled with zeros.
-    pub fn zeros(shape: &[usize]) -> Self {
+    pub fn zeros(shape: [usize; NDIM]) -> Self {
         let data_size = shape.iter().product();
         let data = vec![0.0; data_size];
         Self::new(data, shape)
-    }
-
-    pub fn from_scalar(value: Scalar) -> Self {
-        InternalTensor {
-            storage: Rc::new(Storage::new(vec![value])),
-            shape: vec![1],
-            strides: vec![1],
-            offset: 0,
-            grad: RefCell::new(None),
-            grad_fn: None,
-            parents: Vec::new(),
-            requires_grad: false,
-        }
-        .into()
     }
 
     /// Computes the shape without dimensions of size one.
@@ -87,25 +63,13 @@ impl Tensor {
         let reduced_shape = shape
             .iter()
             .cloned()
-            .filter(|&dim| dim != 1)
+            .filter(|&d| d != 1)
             .collect::<Vec<usize>>();
         if reduced_shape.is_empty() {
             vec![1]
         } else {
             reduced_shape
         }
-    }
-
-    /// Computes the strides for a given shape. Strides are used to calculate the memory offset for each dimension.
-    /// * `shape` - A slice representing the shape of the tensor_old.
-    ///
-    /// Returns a vector containing the computed strides.
-    pub(crate) fn compute_strides(shape: &[usize]) -> Vec<usize> {
-        let mut strides = vec![1; shape.len()];
-        for i in (0..shape.len() - 1).rev() {
-            strides[i] = strides[i + 1] * shape[i + 1];
-        }
-        strides
     }
 
     /// Increments multidimensional indices for iterating over a stride tensor.
@@ -121,152 +85,91 @@ impl Tensor {
         }
     }
 
-    /// Ensures this tensor has a unique (non-shared) storage.
-    /// Clones the storage if it's shared with other tensors.
-    pub fn make_unique(&mut self) {
-        // Clone inner if shared
-        let inner = Rc::make_mut(&mut self.0);
+    // /// Sets the value at the specified multidimensional indices.
+    // /// * `indices` - A slice of indices for each dimension of the tensor_old.
+    // /// * `value` - The value to set at the specified indices.
+    // pub fn set(&mut self, indices: [usize; NDIM], value: Scalar) {
+    //     let flat_index = self.compute_flat_index(indices);
+    //     let mut_data = B::mut_data(self.clone());
+    //     mut_data[flat_index] = value;
+    // }
 
-        // Clone storage if shared
-        if Rc::strong_count(&inner.storage) > 1 {
-            inner.storage = Rc::new(Storage {
-                data: inner.storage.data.clone(),
-            });
-        }
-    }
-
-    /// Sets the value at the specified multidimensional indices.
-    /// * `indices` - A slice of indices for each dimension of the tensor_old.
-    /// * `value` - The value to set at the specified indices.
-    pub fn set(&mut self, indices: &[usize], value: Scalar) {
-        let inner = Rc::make_mut(&mut self.0);
-        let index = inner.compute_flat_index(indices);
-        let storage = Rc::make_mut(&mut inner.storage);
-        storage.data[index] = value;
-    }
-}
-
-pub struct InternalTensor {
-    pub(crate) storage: Rc<Storage>,
-    pub(crate) shape: Vec<usize>,
-    pub(crate) strides: Vec<usize>,
-    pub(crate) offset: usize,
-
-    pub(crate) grad: RefCell<Option<Tensor>>,
-    pub(crate) grad_fn: Option<Rc<dyn GradFn>>,
-    pub(crate) parents: Vec<Tensor>,
-    pub(crate) requires_grad: bool,
-}
-
-impl InternalTensor {
-    /// Creates a new Tensor with the given data and shape.
-    ///
-    /// The data length must match the product of the shape dimensions.
-    ///
-    /// * `data` - A vector containing the tensor_old data.
-    /// * `shape` - A slice representing the shape of the tensor_old.
-    pub fn new(data: Vec<Scalar>, shape: &[usize]) -> Self {
+    pub fn compute_flat_index(&self, indices: [usize; NDIM]) -> usize {
+        let strides = B::strides(self);
+        let offset = B::offset(self);
+        let shape = B::shape(self);
         assert_eq!(
-            data.len(),
-            shape.iter().product(),
-            "Data length does not match shape dimensions"
+            indices.len(),
+            shape.len(),
+            "Indices length must match tensor dimension"
         );
-        let strides = Tensor::compute_strides(shape);
-        let offset = 0;
-        let storage = Rc::new(Storage::new(data));
-        InternalTensor {
-            storage,
-            shape: shape.to_vec(),
-            strides,
-            offset,
-            grad: RefCell::new(None),
-            grad_fn: None,
-            parents: Vec::new(),
-            requires_grad: false,
-        }
-    }
 
-    /// Checks if the tensor_old is stored in contiguous memory.
-    /// Returns true if the tensor_old is contiguous, false otherwise.
-    pub(crate) fn is_contiguous(&self) -> bool {
-        if self.offset != 0 {
-            return false;
+        let mut flat_index = offset;
+        for (i, &idx) in indices.iter().enumerate() {
+            assert!(
+                idx <= shape[i],
+                "Index {idx} out of bounds for dimension {i}",
+            );
+            flat_index += idx * strides[i];
         }
-        let expected_strides = Tensor::compute_strides(&self.shape);
-        self.strides == expected_strides
-    }
-
-    /// Returns the shape of the tensor_old as a slice.
-    pub fn shape(&self) -> &[usize] {
-        &self.shape
+        flat_index
     }
 
     /// Gets the value at the specified multidimensional indices.
     /// * `indices` - A slice of indices for each dimension of the tensor_old.
-    /// Returns the value at the specified indices.
-    pub fn get(&self, indices: &[usize]) -> Scalar {
-        self.storage.data[self.compute_flat_index(indices)]
+    //
+    // Returns the value at the specified indices.
+    pub fn get(&self, indices: [usize; NDIM]) -> Scalar {
+        let data = B::data(self);
+        data[self.compute_flat_index(indices)]
+    }
+
+    pub fn set(&self, indices: [usize; NDIM], value: Scalar) {
+        let flat_idx = self.compute_flat_index(indices);
+        B::with_mut_data(self, |data| {
+            data[flat_idx] = value;
+        });
     }
 
     /// Checks if the tensor_old is a scalar (i.e., has shape [1]).
     /// # Returns
     /// True if the tensor_old is a scalar, false otherwise.
     pub fn is_scalar(&self) -> bool {
-        self.shape.iter().product::<usize>() == 1
-    }
-
-    /// Returns the total number of elements in the tensor_old.
-    pub fn numel(&self) -> usize {
-        self.shape.iter().product()
+        self.shape().iter().product::<usize>() == 1
     }
 
     pub fn as_scalar(&self) -> Scalar {
         if !self.is_scalar() {
             panic!("Tensor is not a scalar")
         }
-        self.storage.data[self.offset]
+        self.get([0; NDIM])
     }
 
-    /// Computes the flat index in the storage for the given multidimensional indices.
-    /// # Arguments
-    /// * `indices` - A slice of indices for each dimension of the tensor_old.
-    /// # Returns
-    /// The computed flat index.
-    pub(crate) fn compute_flat_index(&self, indices: &[usize]) -> usize {
-        assert_eq!(
-            indices.len(),
-            self.shape.len(),
-            "Number of indices must match tensor dimensions"
-        );
-        let mut flat_index = self.offset;
-        for (i, &idx) in indices.iter().enumerate() {
-            assert!(idx < self.shape[i], "Index out of bounds for dimension {i}",);
-            flat_index += idx * self.strides[i];
-        }
-        flat_index
+    pub fn as_slice(&self) -> Vec<Scalar> {
+        B::data(self)
     }
-}
 
-impl Clone for InternalTensor {
-    fn clone(&self) -> Self {
-        InternalTensor {
-            storage: Rc::clone(&self.storage),
-            shape: self.shape.clone(),
-            strides: self.strides.clone(),
-            offset: self.offset,
-            grad: RefCell::new(None),
-            grad_fn: self.grad_fn.clone(),
-            parents: self.parents.clone(),
-            requires_grad: self.requires_grad,
-        }
+    pub fn with_mut_data(&self, f: impl FnOnce(&mut [Scalar])) {
+        B::with_mut_data(self, f);
+    }
+
+    pub fn shape(&self) -> [usize; NDIM] {
+        B::shape(self)
+    }
+
+    pub fn strides(&self) -> [usize; NDIM] {
+        B::strides(self)
+    }
+
+    pub fn offset(&self) -> usize {
+        B::offset(self)
     }
 }
 
-impl Tensor {
+impl<B: Backend, const NDIM: usize> Tensor<B, NDIM> {
     fn debug_min(&self) -> Scalar {
         *self
-            .storage
-            .data
+            .as_slice()
             .iter()
             .min_by(|a, b| a.partial_cmp(b).unwrap())
             .unwrap()
@@ -274,21 +177,21 @@ impl Tensor {
 
     fn debug_max(&self) -> Scalar {
         *self
-            .storage
-            .data
+            .as_slice()
             .iter()
             .max_by(|a, b| a.partial_cmp(b).unwrap())
             .unwrap()
     }
 }
 
-impl Debug for Tensor {
+impl<B: Backend, const NDIM: usize> Debug for Tensor<B, NDIM> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Tensor")
-            .field("shape", &self.shape)
-            .field("strides", &self.strides)
-            .field("offset", &self.offset)
-            .field("requires_grad", &self.requires_grad)
+            .field("id", &self.id)
+            .field("shape", &self.shape())
+            .field("strides", &self.strides())
+            .field("offset", &self.offset())
+            .field("Internal", &B::internal_debug(self))
             .field(
                 "data",
                 &format_args!(
@@ -300,16 +203,12 @@ impl Debug for Tensor {
                 ),
             )
             .field(
-                "grad",
-                &self
-                    .grad
-                    .borrow()
-                    .as_ref()
-                    .map(|grad| format!("Norm {:.4}", grad.norm().as_scalar()))
-                    .unwrap_or("None".into()),
+                "data sample (10 elements)",
+                &format_args!(
+                    "{:?}",
+                    &self.as_slice()[0..std::cmp::min(10, self.as_slice().len())]
+                ),
             )
-            .field("grad_fn", &self.grad_fn.as_deref().map(|f| f.type_name()))
-            .field("parents", &self.parents.len())
             .finish()
     }
 }

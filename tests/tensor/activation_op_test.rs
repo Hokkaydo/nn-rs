@@ -1,10 +1,11 @@
+use nn_rs::backend::cpu::CPUBackend;
 use nn_rs::linalg::tensor::Tensor;
 
 #[cfg(test)]
 #[test]
 fn test_sigmoid() {
     let data = vec![-2.0, -1.0, 0.0, 1.0, 2.0];
-    let tensor = Tensor::new(data, &[5]);
+    let tensor = Tensor::<CPUBackend, 1>::new(data, [5]);
     let result = tensor.sigmoid();
     let expected_data = vec![
         1.0 / (1.0 + 2.0f32.exp()),
@@ -14,7 +15,7 @@ fn test_sigmoid() {
         1.0 / (1.0 + (-2.0f32).exp()),
     ];
     for i in 0..5 {
-        assert!((result.get(&[i]) - expected_data[i]).abs() < 1e-6);
+        assert!((result.get([i]) - expected_data[i]).abs() < 1e-6);
     }
 }
 
@@ -22,12 +23,12 @@ fn test_sigmoid() {
 #[test]
 fn test_log_softmax() {
     let data = vec![1.0, 2.0, 3.0];
-    let tensor = Tensor::new(data.clone(), &[3]);
+    let tensor = Tensor::<CPUBackend, 1>::new(data.clone(), [3]);
     let result = tensor.log_softmax();
     let sum_exp: f32 = data.iter().map(|&x| x.exp()).sum();
     let expected_data: Vec<f32> = data.iter().map(|&x| (x.exp() / sum_exp).ln()).collect();
     for i in 0..3 {
-        assert!((result.get(&[i]) - expected_data[i]).abs() < 1e-6);
+        assert!((result.get([i]) - expected_data[i]).abs() < 1e-6);
     }
 }
 
@@ -35,17 +36,16 @@ fn test_log_softmax() {
 #[test]
 fn test_softmax() {
     let data = vec![1.0, 2.0, 3.0];
-    let tensor = Tensor::new(data.clone(), &[3]);
+    let tensor = Tensor::<CPUBackend, 1>::new(data.clone(), [3]);
     let result = tensor.softmax();
     let sum_exp: f32 = data.iter().map(|&x| x.exp()).sum();
     let expected_data: Vec<f32> = data.iter().map(|&x| x.exp() / sum_exp).collect();
-    println!("{:?} {:?}", result, expected_data);
     assert_eq!(
         result.shape().iter().product::<usize>(),
         expected_data.len()
     );
     for i in 0..3 {
-        assert!((result.get(&[i]) - expected_data[i]).abs() < 1e-6);
+        assert!((result.get([i]) - expected_data[i]).abs() < 1e-6);
     }
 }
 
@@ -53,10 +53,10 @@ fn test_softmax() {
 #[test]
 fn test_relu() {
     let data = vec![-1.0, 0.0, 2.0, -3.0, 4.0];
-    let tensor = Tensor::new(data, &[5]);
+    let tensor = Tensor::<CPUBackend, 1>::new(data, [5]);
     let result = tensor.relu();
     let expected_data = vec![0.0, 0.0, 2.0, 0.0, 4.0];
     for i in 0..5 {
-        assert_eq!(result.get(&[i]), expected_data[i]);
+        assert_eq!(result.get([i]), expected_data[i]);
     }
 }

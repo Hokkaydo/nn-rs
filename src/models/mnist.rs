@@ -1,11 +1,18 @@
-use crate::helpers::metrics::mse;
-use crate::helpers::optimizer::Optimizer;
+use crate::backend::autograd::{Autograd, clear_tape};
+use crate::backend::autograd::engine::ReverseMode;
+use crate::backend::backend::Backend;
+use crate::backend::cpu::{mark_generation_start, truncate_to_generation};
 use crate::linalg::tensor::{Scalar, Tensor};
-use crate::nn::activation::{ReLU, Sigmoid};
+use crate::nn::activation::{ReLU, Sigmoid, Softmax};
+use crate::nn::Layer;
 use crate::nn::linear::Linear;
-use crate::nn::models::NeuralNetwork;
+use crate::nn::loss::{cross_entropy, mse};
+use crate::nn::models::Sequential;
+use crate::nn::optimizer::Optimizer;
+use rand::SeedableRng;
+use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
-use std::io::Read;
+use std::io::{BufWriter, Read, Write};
 
 pub struct MNIST {
     pub train_images: Vec<Vec<u8>>,
@@ -14,9 +21,9 @@ pub struct MNIST {
     pub test_labels: Vec<u8>,
 }
 
-pub struct MNISTBatch {
-    pub images: Tensor,
-    pub labels: Tensor,
+pub struct MNISTBatch<B: Backend> {
+    pub images: Tensor<Autograd<B>, 2>,
+    pub labels: Tensor<Autograd<B>, 2>,
 }
 
 impl MNIST {
@@ -29,8 +36,7 @@ impl MNIST {
         let mut train_labels = Vec::new();
         let mut test_images = Vec::new();
         let mut test_labels = Vec::new();
-        let train_file =
-            std::fs::File::open("./mnist/train.bin").expect("Failed to open train file");
+        let train_file = std::fs::File::open("./mnist/train.bin").expect("Failed to open train file");
         let test_file = std::fs::File::open("./mnist/test.bin").expect("Failed to open test file");
 
         let mut train_reader = std::io::BufReader::new(train_file);
@@ -59,9 +65,6 @@ impl MNIST {
             train_reader
                 .read_exact(&mut image)
                 .expect("Failed to read train image");
-            image
-                .iter_mut()
-                .for_each(|x| *x = (*x as Scalar / 255.0) as u8);
             train_images.push(image);
         }
         for _ in 0..num_test {
@@ -75,16 +78,15 @@ impl MNIST {
             test_reader
                 .read_exact(&mut image)
                 .expect("Failed to read test image");
-            image
-                .iter_mut()
-                .for_each(|x| *x = (*x as Scalar / 255.0) as u8);
+
             test_images.push(image);
         }
         // TODO : Remove this limitation after testing
-        train_images = train_images[0..100].to_vec();
-        train_labels = train_labels[0..100].to_vec();
-        test_images = test_images[0..100].to_vec();
-        test_labels = test_labels[0..100].to_vec();
+        // train_images = train_images[0..100].to_vec();
+        // train_labels = train_labels[0..100].to_vec();
+        // test_images = test_images[0..100].to_vec();
+        // test_labels = test_labels[0..100].to_vec();
+
         MNIST {
             train_images,
             train_labels,
@@ -99,41 +101,39 @@ impl MNIST {
         one_hot
     }
 
-    pub fn to_batches(
+    pub fn to_batches<B: Backend> (
         &self,
-        images: &[Vec<u8>],
+        images: &[Vec<u8>], 
         labels: &[u8],
         batch_size: usize,
-        flat: bool,
-    ) -> Vec<MNISTBatch> {
+    ) -> Vec<MNISTBatch<B>> {
         let mut batches = Vec::new();
         let num_batches = images.len() / batch_size;
+        let mut rng = rand::rng();
 
         let mut shuffled_indices: Vec<usize> = (0..images.len()).collect();
-        shuffled_indices.shuffle(&mut rand::rng());
+        shuffled_indices.shuffle(&mut rng);
 
+        
         for i in 0..num_batches {
             let start = i * batch_size;
             let end = start + batch_size;
             let indices = &shuffled_indices[start..end];
 
-            let images: Vec<Scalar> = indices
-                .iter()
-                .flat_map(|&idx| images[idx].iter().map(|&x| x as Scalar / 255.0))
-                .collect();
+            let mut images_vec = Vec::new();
+            for &idx in indices {
+                for &x in &images[idx] {
+                    images_vec.push(x as Scalar / 255.0);
+                }
+            }
 
             let labels: Vec<Scalar> = indices
                 .iter()
                 .flat_map(|&idx| Self::label_to_one_hot(labels[idx]))
                 .collect();
 
-            let images_tensor = if flat {
-                Tensor::new(images, &[batch_size, 28 * 28])
-            } else {
-                Tensor::new(images, &[batch_size, 28, 28])
-            };
-
-            let labels_tensor = Tensor::new(labels, &[batch_size, 10]);
+            let images_tensor = Tensor::new(images_vec, [batch_size, 28 * 28]);
+            let labels_tensor = Tensor::new(labels, [batch_size, 10]);
 
             batches.push(MNISTBatch {
                 images: images_tensor,
@@ -143,20 +143,22 @@ impl MNIST {
         batches
     }
 
-    pub fn train_linear_model(
+    pub fn train_linear_model<B: Backend>(
         &self,
-        batches: &mut Vec<MNISTBatch>,
+        batches: &mut [MNISTBatch<B>],
         epochs: usize,
         optimizer: Box<dyn Optimizer>,
-    ) -> NeuralNetwork {
+    ) -> Sequential<B> {
         let input_size = 28 * 28; // 28x28 pixels
         let output_size = 10; // 10 classes for digits 0-9
 
-        let mut net = NeuralNetwork::init(vec![
-            Box::new(Linear::init(input_size, 128)),
-            Box::new(ReLU::default()),
-            Box::new(Linear::init(128, output_size)),
-            Box::new(Sigmoid),
+        let mut net = Sequential::new(vec![
+            Layer::Linear(Linear::new(input_size, 256)),
+            Layer::ReLU(ReLU::new()),
+            Layer::Linear(Linear::new(256, 128)),
+            Layer::ReLU(ReLU::new()),
+            Layer::Linear(Linear::new(128, output_size)),
+            Layer::Softmax(Softmax::new())
         ]);
 
         self.train(batches, epochs, optimizer, &mut net);
@@ -164,48 +166,79 @@ impl MNIST {
         net
     }
 
-    pub fn train(
+    pub fn train<B: Backend>(
         &self,
-        batches: &mut Vec<MNISTBatch>,
+        batches: &mut [MNISTBatch<B>],
         epochs: usize,
         mut optimizer: Box<dyn Optimizer>,
-        net: &mut NeuralNetwork,
+        net: &mut Sequential<B>,
     ) {
         for epoch in 0..epochs {
             batches.shuffle(&mut rand::rng());
             for (i, batch) in batches.iter().enumerate() {
-                let mut output = net.forward(batch.images.clone());
-                let mut loss = mse(&batch.labels, &output);
+                mark_generation_start();
+                let input = batch.images.clone();
+                let target = batch.labels.clone();
+                let output = net.forward(&input);
+                let loss = cross_entropy(&target, &output);
                 let loss_scalar = loss.as_scalar();
                 println!("Epoch {epoch}: Batch {i} Loss = {loss_scalar}");
-                loss.backward();
-                if i > 0 && i % 10 == 0 {
-                    optimizer.step(net.parameters_mut(), true);
-                    net.parameters_mut().iter_mut().for_each(|x| x.detach());
-                }
-                loss.detach();
-                output.detach();
+                loss.backward::<ReverseMode>();
+                optimizer.step(&net.parameters());
+                clear_tape();
+                truncate_to_generation();
             }
-            optimizer.step(net.parameters_mut(), true);
-            optimizer.reset();
-            net.parameters_mut().iter_mut().for_each(|x| x.detach());
         }
     }
 
-    pub fn test_model(&self, batches: &Vec<MNISTBatch>, net: &mut NeuralNetwork) -> Scalar {
+    pub fn test_model<B: Backend>(&self, batches: &[MNISTBatch<B>], net: &mut Sequential<B>) -> Scalar {
         let mut correct = 0;
         let mut total = 0;
 
         for batch in batches {
-            let output = net.forward(batch.images.clone());
-            for (i, &label) in batch.labels.storage.data.iter().enumerate() {
-                let predicted = output.storage.data[i].round() as u8;
-                if predicted == label as u8 {
+            let input = batch.images.clone();
+            let output = net.forward(&input).as_slice();
+            for i in 0..(batch.images.shape()[0]) {
+                let label_slice = &batch.labels.as_slice()[i * 10..(i + 1) * 10];
+                let actual = label_slice.iter().enumerate().max_by(|a, b| a.1.partial_cmp(b.1).unwrap()).unwrap().0 as u8;
+                let pred_slice = &output[i * 10..(i + 1) * 10];
+                let predicted = pred_slice.iter().enumerate().max_by(|a, b| a.1.partial_cmp(b.1).unwrap()).unwrap().0 as u8;         
+                
+                if predicted == actual {
                     correct += 1;
+                } else {
+                    println!("Misclassified: Predicted {}, Actual {}", predicted, actual);
+                    println!("Predicted probabilities: {:?}", pred_slice);
+                    // data to u8
+                    // let image: Vec<u8> = input.as_slice()[i * 784..(i + 1) * 784].iter().map(|&x| (x * 255.0) as u8).collect();
+                    // self.dump_failed_image(predicted, actual, i, &image, "failed_images");
                 }
                 total += 1;
             }
         }
         correct as Scalar / total as Scalar
     }
+    // dump failed image under given folder
+    // fn dump_failed_image(&self, predicted: u8, actual: u8, id: usize, image: &[u8], folder: &str) {
+    //     use std::fs;
+    //     use std::io::Write;
+    //     use std::path::Path;
+
+    //     let filename = format!("{}/pred_{}_actual_{}_{id}.pgm", folder, predicted, actual);
+    //     let path = Path::new(&filename);
+    //     if let Some(parent) = path.parent() {
+    //         fs::create_dir_all(parent).expect("Failed to create directories");
+    //     }
+    //     // write as visible image format
+    //     let file = fs::File::create(&filename).expect("Failed to create file");
+    //     let mut w = BufWriter::new(file);
+
+    //     // Header
+    //     w.write_all(b"P5\n").unwrap();
+    //     w.write_all(b"28 28\n").unwrap();
+    //     w.write_all(b"255\n").unwrap();
+
+    //     // Pixel data (row-major)
+    //     w.write_all(image).unwrap();
+    // }
 }

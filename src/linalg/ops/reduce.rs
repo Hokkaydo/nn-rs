@@ -1,86 +1,31 @@
-use crate::linalg::autograd::grad_fn::reduce::{MeanGradFn, SumAxisGradFn, SumGradFn};
-use crate::linalg::tensor::{InternalTensor, Scalar, Storage, Tensor};
-use crate::not_implemented_grad_fn;
-use std::cell::RefCell;
-use std::rc::Rc;
+use crate::backend::backend::Backend;
+use crate::linalg::tensor::Tensor;
 
-impl Tensor {
-    pub fn mean(&self, axes: &[usize]) -> Tensor {
-        let mut result_data = Vec::new();
-        let mut count = 1.0;
-        let mut reduced_shape = self.shape.clone();
-
+impl<B: Backend, const NDIM: usize> Tensor<B, NDIM> {
+    /// Computes the mean of the tensor along specified axes
+    /// # Arguments
+    /// * `axes` - A slice of axes along which to compute the mean
+    /// # Returns
+    /// A new tensor containing the mean values
+    pub fn mean(&self, axes: &[usize]) -> Self {
+        assert!(axes.len() <= NDIM, "Too many axes for mean");
         for &axis in axes {
-            count *= self.shape[axis] as Scalar;
-            reduced_shape[axis] = 1;
+            assert!(axis < NDIM, "Axis out of bounds for mean");
         }
-        reduced_shape.retain(|&dim| dim != 1);
-        if reduced_shape.is_empty() {
-            reduced_shape.push(1);
-        }
-
-        let total_elements: usize = reduced_shape.iter().product();
-        for i in 0..total_elements {
-            let mut sum = 0.0;
-            for j in 0..(self.shape.iter().product::<usize>() / total_elements) {
-                let index = i + j * total_elements;
-                sum += self.storage.data[index];
-            }
-            result_data.push(sum / count);
-        }
-        let strides = Tensor::compute_strides(&reduced_shape);
-
-        InternalTensor {
-            storage: Rc::new(Storage::new(result_data)),
-            shape: reduced_shape,
-            strides,
-            offset: 0,
-            grad: RefCell::new(None),
-            grad_fn: if self.requires_grad {
-                Some(Rc::new(MeanGradFn::new(axes.to_vec(), self.shape.clone())))
-            } else {
-                None
-            },
-            parents: if self.requires_grad {
-                vec![self.clone()]
-            } else {
-                vec![]
-            },
-            requires_grad: self.requires_grad,
-        }
-        .into()
+        B::mean(self, Some(axes))
     }
 
-    pub fn mean_scalar(&self) -> Tensor {
-        let total_elements: usize = self.shape.iter().product();
-        let sum: Scalar = self.storage.data.iter().cloned().sum();
-        let mean = sum / (total_elements as Scalar);
-
-        InternalTensor {
-            storage: Rc::new(Storage::new(vec![mean])),
-            shape: vec![1],
-            strides: vec![1],
-            offset: 0,
-            grad: RefCell::new(None),
-            grad_fn: if self.requires_grad {
-                Some(Rc::new(MeanGradFn::new(
-                    (0..self.shape.len()).collect(),
-                    self.shape.clone(),
-                )))
-            } else {
-                None
-            },
-            parents: if self.requires_grad {
-                vec![self.clone()]
-            } else {
-                vec![]
-            },
-            requires_grad: self.requires_grad,
-        }
-        .into()
+    /// Computes the mean of all elements in the tensor
+    /// # Returns
+    /// A new tensor containing the mean value
+    pub fn mean_scalar(&self) -> Self {
+        B::mean(self, None)
     }
 
-    pub fn norm(&self) -> Tensor {
+    /// Computes the L2 norm of the tensor
+    /// # Returns
+    /// A new tensor containing the L2 norm
+    pub fn norm(&self) -> Self {
         self.square().sum().sqrt()
     }
 
@@ -92,36 +37,10 @@ impl Tensor {
     /// * `len` - The length of the slice.
     /// # Returns
     /// A new tensor containing the slice.
-    pub fn slice(&self, axis: usize, start: usize, len: usize) -> Tensor {
-        assert!(axis < self.shape.len(), "Axis out of bounds");
-        assert!(start + len <= self.shape[axis], "Invalid slice indices");
-
-        let mut new_shape = self.shape.clone();
-        new_shape[axis] = len;
-
-        let mut result_data = Vec::with_capacity(new_shape.iter().product());
-        let mut coords = vec![0; self.shape.len()];
-        for _ in 0..new_shape.iter().product() {
-            coords[axis] += start;
-            let idx = self.compute_flat_index(&coords);
-            result_data.push(self.storage.data[idx]);
-            coords[axis] -= start;
-            Tensor::increment_indices(&mut coords, &new_shape);
-        }
-
-        let strides = Tensor::compute_strides(&new_shape);
-
-        InternalTensor {
-            storage: Rc::new(Storage::new(result_data)),
-            shape: new_shape,
-            strides,
-            offset: 0,
-            grad: RefCell::new(None),
-            grad_fn: not_implemented_grad_fn!("Slice"),
-            parents: vec![],
-            requires_grad: self.requires_grad,
-        }
-        .into()
+    pub fn slice(&self, axis: usize, start: usize, len: usize) -> Self {
+        assert!(axis < NDIM, "Axis out of bounds");
+        assert!(start + len <= self.shape()[axis], "Invalid slice indices");
+        B::slice(self, axis, start, len)
     }
 
     /// Gathers elements from the tensor along specified axis using provided indices
@@ -130,64 +49,15 @@ impl Tensor {
     /// * `indices` - A vector containing the indices to gather
     /// # Returns
     /// A new tensor containing the gathered elements
-    pub fn gather(&self, axis: usize, indices: &[usize]) -> Tensor {
-        let ndim = self.shape.len();
-        assert!(axis < ndim);
+    pub fn gather(&self, axis: usize, indices: &[usize]) -> Self {
+        assert!(axis < NDIM);
 
-        let axis_dim = self.shape[axis];
+        let axis_dim = self.shape()[axis];
         for &idx in indices {
-            assert!(idx < axis_dim, "gather index out of bounds");
+            assert!(idx < axis_dim, "Gather index out of bounds");
         }
 
-        // Output shape
-        let mut out_shape = self.shape.clone();
-        out_shape[axis] = indices.len();
-
-        let out_strides = Tensor::compute_strides(&out_shape);
-        let total: usize = out_shape.iter().product();
-
-        let in_strides = &self.strides;
-
-        let mut out_data = Vec::with_capacity(total);
-
-        let mut coord = vec![0usize; ndim];
-        let mut in_offset = self.offset;
-
-        for _ in 0..total {
-            let gather_idx = indices[coord[axis]];
-            let src_offset = in_offset + gather_idx * in_strides[axis];
-
-            out_data.push(self.storage.data[src_offset]);
-
-            // increment output index
-            for d in (0..ndim).rev() {
-                coord[d] += 1;
-                if d != axis {
-                    in_offset += in_strides[d];
-                }
-
-                if coord[d] < out_shape[d] {
-                    break;
-                }
-
-                coord[d] = 0;
-                if d != axis {
-                    in_offset -= in_strides[d] * out_shape[d];
-                }
-            }
-        }
-
-        InternalTensor {
-            storage: Rc::new(Storage::new(out_data)),
-            shape: out_shape,
-            strides: out_strides,
-            offset: 0,
-            grad: RefCell::new(None),
-            grad_fn: not_implemented_grad_fn!("Gather"),
-            parents: vec![],
-            requires_grad: self.requires_grad,
-        }
-        .into()
+        B::gather(self, axis, indices)
     }
 
     /// Computes the indices of the maximum value in the tensor
@@ -196,128 +66,67 @@ impl Tensor {
     /// # Returns
     /// A vector containing the indices of the maximum values along the specified axis
     /// # Example
-    /// ```rust
+    /// ```rust,ignore
     /// use nn_rs::linalg::tensor::Tensor;
-    /// let tensor = Tensor::new(vec![4.0, 3.0, 6.0, 1.0, 5.0, 2.0], &vec![2, 3]);
-    /// // 4 3 6
-    /// // 1 5 2
-    /// assert_eq!(tensor.argmax_axis(0), vec![0, 1, 0]); // Max values in each column are 4, 5, 6
-    /// assert_eq!(tensor.argmax_axis(1), vec![2, 1]);    // Max values in each row are 6, 5
+    /// // See integration tests for usage examples
     /// ```
-    pub fn argmax_axis(&self, axis: usize) -> Vec<usize> {
-        assert!(axis < self.shape.len(), "Axis out of bounds");
-        // find indices of max values along given axis
-        let mut result_indices = Vec::new();
-        let outer_dim = self.shape.iter().take(axis).product::<usize>();
-        let inner_dim = self.shape.iter().skip(axis + 1).product::<usize>();
-        let axis_dim = self.shape[axis];
-        for outer in 0..outer_dim {
-            for inner in 0..inner_dim {
-                let mut max_index = 0;
-                let mut max_value = Scalar::MIN;
-                for axis_index in 0..axis_dim {
-                    let index = outer * axis_dim * inner_dim + axis_index * inner_dim + inner;
-                    let value = self.storage.data[index];
-                    if value > max_value {
-                        max_value = value;
-                        max_index = axis_index;
-                    }
-                }
-                result_indices.push(max_index);
-            }
+    pub fn argmax(&self, axis: usize) -> Tensor<B, { NDIM - 1 }> {
+        assert!(axis <= NDIM, "Too many axes for argmax");
+        B::argmax(self, axis)
+    }
+
+    /// Computes the maximum value in the tensor along specified axes
+    /// # Arguments
+    /// * `axes` - A slice of axes along which to compute the maximum
+    /// # Returns
+    /// A new tensor containing the maximum values
+    pub fn max(&self, axes: &[usize]) -> Self {
+        assert!(axes.len() <= NDIM, "Too many axes for max");
+        for &axis in axes {
+            assert!(axis < NDIM, "Axis out of bounds for max");
         }
-        result_indices
+        B::max(self, Some(axes))
+    }
+
+    /// Computes the minimum value in the tensor along specified axes
+    /// # Arguments
+    /// * `axes` - A slice of axes along which to compute the minimum
+    /// # Returns
+    /// A new tensor containing the minimum values
+    pub fn min(&self, axes: &[usize]) -> Self {
+        assert!(axes.len() <= NDIM, "Too many axes for min");
+        for &axis in axes {
+            assert!(axis < NDIM, "Axis out of bounds for min");
+        }
+        B::min(self, Some(axes))
     }
 
     /// Computes the maximum value in the tensor
     /// # Returns
     /// The maximum value
-    pub fn max(&self) -> Tensor {
-        let max_value = self
-            .storage
-            .data
-            .iter()
-            .cloned()
-            .fold(Scalar::MIN, Scalar::max);
-        InternalTensor {
-            storage: Rc::new(Storage::new(vec![max_value])),
-            shape: vec![1],
-            strides: vec![1],
-            offset: 0,
-            grad: RefCell::new(None),
-            grad_fn: not_implemented_grad_fn!("max"),
-            parents: vec![],
-            requires_grad: self.requires_grad,
-        }
-        .into()
+    pub fn max_scalar(&self) -> Self {
+        B::max(self, None)
+    }
+
+    /// Computes the minimum value in the tensor
+    /// # Returns
+    /// The minimum value
+    pub fn min_scalar(&self) -> Self {
+        B::min(self, None)
     }
 
     /// Computes the sum of all elements in the tensor
     /// # Returns
     /// A tensor containing the sum of all elements
-    pub fn sum(&self) -> Tensor {
-        let sum_value: Scalar = self.storage.data.iter().cloned().sum();
-
-        InternalTensor {
-            storage: Rc::new(Storage::new(vec![sum_value])),
-            shape: vec![1],
-            strides: vec![1],
-            offset: 0,
-            grad: RefCell::new(None),
-            grad_fn: if self.requires_grad {
-                Some(Rc::new(SumGradFn::new(self.shape.clone())))
-            } else {
-                None
-            },
-            parents: if self.requires_grad {
-                vec![self.clone()]
-            } else {
-                vec![]
-            },
-            requires_grad: self.requires_grad,
-        }
-        .into()
+    pub fn sum(&self) -> Self {
+        B::sum(self, None)
     }
 
-    pub fn sum_axis(&self, axis: usize) -> Tensor {
-        assert!(axis < self.shape.len(), "Axis out of bounds");
-        let mut result_data = Vec::new();
-        let mut reduced_shape = self.shape.clone();
-        reduced_shape[axis] = 1;
-        reduced_shape.retain(|&dim| dim != 1);
-        if reduced_shape.is_empty() {
-            reduced_shape.push(1);
+    pub fn sum_axis(&self, axes: &[usize]) -> Self {
+        assert!(axes.len() < NDIM, "Too many axes for sum");
+        for &axis in axes {
+            assert!(axis < NDIM, "Axis out of bounds for sum");
         }
-
-        let total_elements: usize = reduced_shape.iter().product();
-        for i in 0..total_elements {
-            let mut sum = 0.0;
-            for j in 0..(self.shape.iter().product::<usize>() / total_elements) {
-                let index = i + j * total_elements;
-                sum += self.storage.data[index];
-            }
-            result_data.push(sum);
-        }
-        let strides = Tensor::compute_strides(&reduced_shape);
-
-        InternalTensor {
-            storage: Rc::new(Storage::new(result_data)),
-            shape: reduced_shape,
-            strides,
-            offset: 0,
-            grad: RefCell::new(None),
-            grad_fn: if self.requires_grad {
-                Some(Rc::new(SumAxisGradFn::new(self.shape.clone())))
-            } else {
-                None
-            },
-            parents: if self.requires_grad {
-                vec![self.clone()]
-            } else {
-                vec![]
-            },
-            requires_grad: self.requires_grad,
-        }
-        .into()
+        B::sum(self, Some(axes))
     }
 }
