@@ -1,7 +1,6 @@
 use crate::backend::autograd::Autograd;
 use crate::backend::backend::Backend;
 use crate::linalg::tensor::Tensor;
-use crate::nn::Layer;
 
 pub struct ReLU<B: Backend> { 
     _marker: std::marker::PhantomData<B>,

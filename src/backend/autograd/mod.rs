@@ -238,10 +238,6 @@ pub(crate) fn store_grad(param_id: TensorId, grad_id: TensorId) {
     GRAD_STORAGE.with(|s| { s.borrow_mut().insert(param_id, grad_id); });
 }
 
-pub(crate) fn get_requires_grad(id: TensorId) -> bool {
-    REQUIRES_GRAD.with(|r| r.borrow().get(&id).copied().unwrap_or(false))
-}
-
 pub fn get_grad_id(param_id: TensorId) -> Option<TensorId> {
     GRAD_STORAGE.with(|s| s.borrow().get(&param_id).copied())
 }

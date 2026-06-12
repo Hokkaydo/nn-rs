@@ -7,10 +7,7 @@ mod unary;
 mod view;
 
 use crate::backend::allocator::{Allocator, ArenaAllocator};
-use crate::backend::backend::{
-    ActivationOps, Backend, BinaryOps, MatMulOps, ReductionOps, ReverseScalarOps, ScalarOps,
-    ShapeOps, TensorOps, UnaryOps, ViewOps,
-};
+use crate::backend::backend::{Backend, TensorOps};
 use crate::linalg::tensor::{Scalar, Tensor, TensorId};
 use std::cell::RefCell;
 
@@ -23,7 +20,11 @@ pub fn truncate_to_generation() {
 }
 
 pub fn shape_dyn_raw(id: TensorId) -> Vec<usize> {
-    ALLOCATOR.with(|a| a.borrow().shape_dyn(id).expect("Tensor not found in allocator"))
+    ALLOCATOR.with(|a| {
+        a.borrow()
+            .shape_dyn(id)
+            .expect("Tensor not found in allocator")
+    })
 }
 
 pub fn data_by_id(id: TensorId) -> Vec<crate::linalg::tensor::Scalar> {

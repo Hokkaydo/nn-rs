@@ -4,15 +4,13 @@ use crate::backend::backend::Backend;
 use crate::backend::cpu::{mark_generation_start, truncate_to_generation};
 use crate::linalg::tensor::{Scalar, Tensor};
 use crate::nn::Layer;
-use crate::nn::activation::{ReLU, Sigmoid, Softmax};
+use crate::nn::activation::{ReLU, Softmax};
 use crate::nn::linear::Linear;
-use crate::nn::loss::{cross_entropy, mse};
+use crate::nn::loss::cross_entropy;
 use crate::nn::models::Sequential;
 use crate::nn::optimizer::Optimizer;
-use rand::SeedableRng;
-use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
-use std::io::{BufWriter, Read, Write};
+use std::io::{BufWriter, Read};
 
 pub struct MNIST {
     pub train_images: Vec<Vec<u8>>,
