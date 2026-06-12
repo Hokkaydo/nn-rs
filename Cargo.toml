@@ -7,3 +7,27 @@ authors = ["Hokkaydo"]
 [dependencies]
 rand = "0.9.1"
 bytemuck = "1.23.0"
+rayon = "1.12.0"
+
+[[bin]]
+name = "bench_runner"
+path = "src/bench_runner.rs"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "matmul"
+harness = false
+
+[[bench]]
+name = "elemwise"
+harness = false
+
+[[bench]]
+name = "forward"
+harness = false
+
+[[bench]]
+name = "backward"
+harness = false

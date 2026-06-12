@@ -3,7 +3,7 @@ import numpy as np
 
 def csv_to_binary(input_csv, output_file):
     df = pd.read_csv(input_csv).astype(np.uint8)
-    df = df.head(1000)
+    # df = df.head(1000)
 
     with open(output_file, "wb") as f:
         f.write(len(df).to_bytes(4, byteorder="big"))

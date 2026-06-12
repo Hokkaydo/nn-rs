@@ -1,10 +1,10 @@
-use crate::backend::autograd::{Autograd, clear_tape};
 use crate::backend::autograd::engine::ReverseMode;
+use crate::backend::autograd::{Autograd, clear_tape};
 use crate::backend::backend::Backend;
 use crate::backend::cpu::{mark_generation_start, truncate_to_generation};
 use crate::linalg::tensor::{Scalar, Tensor};
-use crate::nn::activation::{ReLU, Sigmoid, Softmax};
 use crate::nn::Layer;
+use crate::nn::activation::{ReLU, Sigmoid, Softmax};
 use crate::nn::linear::Linear;
 use crate::nn::loss::{cross_entropy, mse};
 use crate::nn::models::Sequential;
@@ -36,7 +36,8 @@ impl MNIST {
         let mut train_labels = Vec::new();
         let mut test_images = Vec::new();
         let mut test_labels = Vec::new();
-        let train_file = std::fs::File::open("./mnist/train.bin").expect("Failed to open train file");
+        let train_file =
+            std::fs::File::open("./mnist/train.bin").expect("Failed to open train file");
         let test_file = std::fs::File::open("./mnist/test.bin").expect("Failed to open test file");
 
         let mut train_reader = std::io::BufReader::new(train_file);
@@ -101,9 +102,9 @@ impl MNIST {
         one_hot
     }
 
-    pub fn to_batches<B: Backend> (
+    pub fn to_batches<B: Backend>(
         &self,
-        images: &[Vec<u8>], 
+        images: &[Vec<u8>],
         labels: &[u8],
         batch_size: usize,
     ) -> Vec<MNISTBatch<B>> {
@@ -114,7 +115,6 @@ impl MNIST {
         let mut shuffled_indices: Vec<usize> = (0..images.len()).collect();
         shuffled_indices.shuffle(&mut rng);
 
-        
         for i in 0..num_batches {
             let start = i * batch_size;
             let end = start + batch_size;
@@ -158,7 +158,7 @@ impl MNIST {
             Layer::Linear(Linear::new(256, 128)),
             Layer::ReLU(ReLU::new()),
             Layer::Linear(Linear::new(128, output_size)),
-            Layer::Softmax(Softmax::new())
+            Layer::Softmax(Softmax::new()),
         ]);
 
         self.train(batches, epochs, optimizer, &mut net);
@@ -188,10 +188,15 @@ impl MNIST {
                 clear_tape();
                 truncate_to_generation();
             }
+            net.dump("mnist_output.bin");
         }
     }
 
-    pub fn test_model<B: Backend>(&self, batches: &[MNISTBatch<B>], net: &mut Sequential<B>) -> Scalar {
+    pub fn test_model<B: Backend>(
+        &self,
+        batches: &[MNISTBatch<B>],
+        net: &mut Sequential<B>,
+    ) -> Scalar {
         let mut correct = 0;
         let mut total = 0;
 
@@ -200,18 +205,31 @@ impl MNIST {
             let output = net.forward(&input).as_slice();
             for i in 0..(batch.images.shape()[0]) {
                 let label_slice = &batch.labels.as_slice()[i * 10..(i + 1) * 10];
-                let actual = label_slice.iter().enumerate().max_by(|a, b| a.1.partial_cmp(b.1).unwrap()).unwrap().0 as u8;
+                let actual = label_slice
+                    .iter()
+                    .enumerate()
+                    .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                    .unwrap()
+                    .0 as u8;
                 let pred_slice = &output[i * 10..(i + 1) * 10];
-                let predicted = pred_slice.iter().enumerate().max_by(|a, b| a.1.partial_cmp(b.1).unwrap()).unwrap().0 as u8;         
-                
+                let predicted = pred_slice
+                    .iter()
+                    .enumerate()
+                    .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                    .unwrap()
+                    .0 as u8;
+
                 if predicted == actual {
                     correct += 1;
                 } else {
                     println!("Misclassified: Predicted {}, Actual {}", predicted, actual);
                     println!("Predicted probabilities: {:?}", pred_slice);
                     // data to u8
-                    // let image: Vec<u8> = input.as_slice()[i * 784..(i + 1) * 784].iter().map(|&x| (x * 255.0) as u8).collect();
-                    // self.dump_failed_image(predicted, actual, i, &image, "failed_images");
+                    let image: Vec<u8> = input.as_slice()[i * 784..(i + 1) * 784]
+                        .iter()
+                        .map(|&x| (x * 255.0) as u8)
+                        .collect();
+                    self.dump_failed_image(predicted, actual, i, &image, "failed_images");
                 }
                 total += 1;
             }
@@ -219,26 +237,26 @@ impl MNIST {
         correct as Scalar / total as Scalar
     }
     // dump failed image under given folder
-    // fn dump_failed_image(&self, predicted: u8, actual: u8, id: usize, image: &[u8], folder: &str) {
-    //     use std::fs;
-    //     use std::io::Write;
-    //     use std::path::Path;
+    fn dump_failed_image(&self, predicted: u8, actual: u8, id: usize, image: &[u8], folder: &str) {
+        use std::fs;
+        use std::io::Write;
+        use std::path::Path;
 
-    //     let filename = format!("{}/pred_{}_actual_{}_{id}.pgm", folder, predicted, actual);
-    //     let path = Path::new(&filename);
-    //     if let Some(parent) = path.parent() {
-    //         fs::create_dir_all(parent).expect("Failed to create directories");
-    //     }
-    //     // write as visible image format
-    //     let file = fs::File::create(&filename).expect("Failed to create file");
-    //     let mut w = BufWriter::new(file);
+        let filename = format!("{}/pred_{}_actual_{}_{id}.pgm", folder, predicted, actual);
+        let path = Path::new(&filename);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("Failed to create directories");
+        }
+        // write as visible image format
+        let file = fs::File::create(&filename).expect("Failed to create file");
+        let mut w = BufWriter::new(file);
 
-    //     // Header
-    //     w.write_all(b"P5\n").unwrap();
-    //     w.write_all(b"28 28\n").unwrap();
-    //     w.write_all(b"255\n").unwrap();
+        // Header
+        w.write_all(b"P5\n").unwrap();
+        w.write_all(b"28 28\n").unwrap();
+        w.write_all(b"255\n").unwrap();
 
-    //     // Pixel data (row-major)
-    //     w.write_all(image).unwrap();
-    // }
+        // Pixel data (row-major)
+        w.write_all(image).unwrap();
+    }
 }

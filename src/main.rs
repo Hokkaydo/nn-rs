@@ -12,7 +12,7 @@ fn main() {
         mnist.train_images.len(),
         mnist.test_images.len()
     );
-    let test_batches = mnist.to_batches::<CPUBackend>(&mnist.test_images, &mnist.test_labels, 100);
+    let test_batches = mnist.to_batches::<CPUBackend>(&mnist.test_images, &mnist.test_labels, 1000);
 
     let mut net = if std::env::args().any(|arg| arg == "--load") {
         load()
@@ -30,7 +30,7 @@ fn main() {
 }
 
 fn train<B: Backend>(mnist: &MNIST, net: Option<Sequential<B>>) -> Sequential<B> {
-    let mut train_batches = mnist.to_batches(&mnist.train_images, &mnist.train_labels, 32);
+    let mut train_batches = mnist.to_batches(&mnist.train_images, &mnist.train_labels, 1000);
     println!(
         "Training on {} batches of size {}",
         train_batches.len(),
@@ -48,7 +48,7 @@ fn train<B: Backend>(mnist: &MNIST, net: Option<Sequential<B>>) -> Sequential<B>
         mnist.train(&mut train_batches, 1, optimizer, &mut trained_net);
         trained_net
     } else {
-        mnist.train_linear_model(&mut train_batches, 10, optimizer)
+        mnist.train_linear_model(&mut train_batches, 20, optimizer)
         // generates data of scalar from 0 to 1000
         // let inputs = Tensor::new(
         //     (0..100).map(|x| (x as f32)/100.0).collect(),
