@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["nn-autograd","nn-core", "nn-gpu", "nn-nn"]
+members = ["nn-autograd","nn-core", "nn-gpu", "nn-layers"]
 
 [package]
 name = "nn-rs"
@@ -12,7 +12,7 @@ authors = ["Hokkaydo"]
 nn-core = { path = "nn-core" }
 nn-autograd = { path = "nn-autograd" }
 nn-gpu = { path = "nn-gpu" }
-nn-nn = { path = "nn-nn" }
+nn-layers = { path = "nn-layers" }
 
 [[bin]]
 name = "bench_runner"

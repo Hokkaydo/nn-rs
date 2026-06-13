@@ -4,12 +4,12 @@ use nn_autograd::autograd::engine::ReverseMode;
 use nn_core::cpu::CPUBackend;
 use nn_core::cpu::{mark_generation_start, truncate_to_generation};
 use nn_core::linalg::tensor::Tensor;
-use nn_nn::nn::activation::{LogSoftmax, ReLU};
-use nn_nn::nn::linear::Linear;
-use nn_nn::nn::loss::cross_entropy;
-use nn_nn::nn::models::Sequential;
-use nn_nn::nn::optimizer::{Optimizer, SGD};
-use nn_nn::nn::Layer;
+use nn_layers::nn::activation::{LogSoftmax, ReLU};
+use nn_layers::nn::linear::Linear;
+use nn_layers::nn::loss::cross_entropy;
+use nn_layers::nn::models::Sequential;
+use nn_layers::nn::optimizer::{Optimizer, SGD};
+use nn_layers::nn::Layer;
 use nn_autograd::autograd::AutogradTensor;
 
 fn make_mnist_net() -> Sequential<CPUBackend> {

@@ -1,5 +1,5 @@
 use crate::autograd::{as_inner, wrap, Autograd, GradNode, GradOp};
-use nn_core::backend::{Backend, MatMulOps, ShapeOps};
+use nn_core::backend::{Backend, MatMulOps};
 use nn_core::linalg::tensor::Tensor;
 
 impl<B: Backend> MatMulOps<Self> for Autograd<B> {
