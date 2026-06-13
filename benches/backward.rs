@@ -1,14 +1,16 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use nn_rs::backend::autograd::{clear_grad_storage, clear_tape, Autograd};
-use nn_rs::backend::autograd::engine::ReverseMode;
-use nn_rs::backend::cpu::CPUBackend;
-use nn_rs::linalg::tensor::Tensor;
-use nn_rs::nn::activation::{LogSoftmax, ReLU};
-use nn_rs::nn::linear::Linear;
-use nn_rs::nn::loss::cross_entropy;
-use nn_rs::nn::models::Sequential;
-use nn_rs::nn::optimizer::{Optimizer, SGD};
-use nn_rs::nn::Layer;
+use nn_autograd::autograd::{clear_grad_storage, clear_tape, Autograd};
+use nn_autograd::autograd::engine::ReverseMode;
+use nn_core::cpu::CPUBackend;
+use nn_core::cpu::{mark_generation_start, truncate_to_generation};
+use nn_core::linalg::tensor::Tensor;
+use nn_nn::nn::activation::{LogSoftmax, ReLU};
+use nn_nn::nn::linear::Linear;
+use nn_nn::nn::loss::cross_entropy;
+use nn_nn::nn::models::Sequential;
+use nn_nn::nn::optimizer::{Optimizer, SGD};
+use nn_nn::nn::Layer;
+use nn_autograd::autograd::AutogradTensor;
 
 fn make_mnist_net() -> Sequential<CPUBackend> {
     Sequential::new(vec![
@@ -40,7 +42,7 @@ fn bench_backward(c: &mut Criterion) {
                     .map(|i| if i % 10 == 0 { 1.0 } else { 0.0 })
                     .collect();
 
-                nn_rs::backend::cpu::mark_generation_start();
+                mark_generation_start();
 
                 b.iter_custom(|iters| {
                     let start = std::time::Instant::now();
@@ -61,7 +63,7 @@ fn bench_backward(c: &mut Criterion) {
                         // Reset for next iteration.
                         clear_tape();
                         clear_grad_storage();
-                        nn_rs::backend::cpu::truncate_to_generation();
+                        truncate_to_generation();
                     }
                     start.elapsed()
                 });

@@ -1,7 +1,3 @@
-"""
-cargo build --bin bench_runner --release   # once, or after Rust code changes
-python python/bench_matmul.py
-"""
 import csv
 import io
 import os
@@ -145,7 +141,6 @@ for ax, ylabel, title in [
     ax.legend()
     ax.grid(True, alpha=0.3)
     
-# draw ref O(n) dashed black for latency
 ref_sizes = np.array(SIZES)
 ref_latency = 1e-6 * ref_sizes**3  # O(n^3) latency reference
 ax_lat.plot(ref_sizes, ref_latency, linestyle="--", color="black", label="O(n³) ref")

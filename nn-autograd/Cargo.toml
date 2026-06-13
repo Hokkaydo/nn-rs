@@ -1,0 +1,8 @@
+[package]
+name = "nn-autograd"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+nn-core = { path = "../nn-core" }
+rand = "0.9.1"

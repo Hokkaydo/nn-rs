@@ -1,11 +1,12 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use nn_rs::backend::autograd::Autograd;
-use nn_rs::backend::cpu::CPUBackend;
-use nn_rs::linalg::tensor::Tensor;
-use nn_rs::nn::activation::{LogSoftmax, ReLU};
-use nn_rs::nn::linear::Linear;
-use nn_rs::nn::models::Sequential;
-use nn_rs::nn::Layer;
+use nn_autograd::autograd::{Autograd, clear_tape};
+use nn_core::cpu::CPUBackend;
+use nn_core::cpu::{mark_generation_start, truncate_to_generation};
+use nn_core::linalg::tensor::Tensor;
+use nn_nn::nn::activation::{LogSoftmax, ReLU};
+use nn_nn::nn::linear::Linear;
+use nn_nn::nn::models::Sequential;
+use nn_nn::nn::Layer;
 
 fn make_mnist_net() -> Sequential<CPUBackend> {
     Sequential::new(vec![
@@ -29,7 +30,7 @@ fn bench_forward(c: &mut Criterion) {
             &batch_size,
             |b, &bs| {
                 let net = make_mnist_net();
-                nn_rs::backend::cpu::mark_generation_start();
+                mark_generation_start();
                 b.iter_custom(|iters| {
                     let start = std::time::Instant::now();
                     for _ in 0..iters {
@@ -38,8 +39,8 @@ fn bench_forward(c: &mut Criterion) {
                             [bs, 784],
                         );
                         let _out = std::hint::black_box(net.forward(&input));
-                        nn_rs::backend::autograd::clear_tape();
-                        nn_rs::backend::cpu::truncate_to_generation();
+                        clear_tape();
+                        truncate_to_generation();
                     }
                     start.elapsed()
                 });

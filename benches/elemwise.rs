@@ -1,7 +1,8 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use nn_rs::backend::backend::BinaryOps;
-use nn_rs::backend::cpu::CPUBackend;
-use nn_rs::linalg::tensor::Tensor;
+use nn_core::backend::BinaryOps;
+use nn_core::cpu::CPUBackend;
+use nn_core::linalg::tensor::Tensor;
+use nn_core::cpu::{mark_generation_start, truncate_to_generation};
 
 fn bench_add(c: &mut Criterion) {
     let mut group = c.benchmark_group("elemwise_add");
@@ -11,12 +12,12 @@ fn bench_add(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("cpu", n), &n, |b, &sz| {
             let a = Tensor::<CPUBackend, 1>::new(vec![1.0f32; sz], [sz]);
             let bv = Tensor::<CPUBackend, 1>::new(vec![2.0f32; sz], [sz]);
-            nn_rs::backend::cpu::mark_generation_start();
+            mark_generation_start();
             b.iter_custom(|iters| {
                 let start = std::time::Instant::now();
                 for _ in 0..iters {
                     let _r = std::hint::black_box(CPUBackend::add(&a, &bv));
-                    nn_rs::backend::cpu::truncate_to_generation();
+                    truncate_to_generation();
                 }
                 start.elapsed()
             });
@@ -33,12 +34,12 @@ fn bench_mul(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("cpu", n), &n, |b, &sz| {
             let a = Tensor::<CPUBackend, 1>::new(vec![1.0f32; sz], [sz]);
             let bv = Tensor::<CPUBackend, 1>::new(vec![2.0f32; sz], [sz]);
-            nn_rs::backend::cpu::mark_generation_start();
+            mark_generation_start();
             b.iter_custom(|iters| {
                 let start = std::time::Instant::now();
                 for _ in 0..iters {
                     let _r = std::hint::black_box(CPUBackend::mul(&a, &bv));
-                    nn_rs::backend::cpu::truncate_to_generation();
+                    truncate_to_generation();
                 }
                 start.elapsed()
             });

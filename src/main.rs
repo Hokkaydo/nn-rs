@@ -1,8 +1,8 @@
-use nn_rs::backend::backend::Backend;
-use nn_rs::backend::cpu::CPUBackend;
-use nn_rs::models::mnist::MNIST;
-use nn_rs::nn::models::Sequential;
-use nn_rs::nn::optimizer::{Adam, Optimizer, SGD};
+use nn_core::backend::Backend;
+use nn_core::cpu::CPUBackend;
+use nn_nn::models::mnist::MNIST;
+use nn_nn::nn::models::Sequential;
+use nn_nn::nn::optimizer::{Adam, Optimizer, SGD};
 
 fn main() {
     let mnist = MNIST::load_mnist();

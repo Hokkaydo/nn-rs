@@ -1,12 +1,3 @@
-"""
-Benchmark forward and backward pass at increasing batch sizes:
-Rust CPU (bench_runner) vs PyTorch CPU.
-
-Run from the repo root:
-    cargo build --bin bench_runner --release   # once, or after Rust code changes
-    python python/bench_forward.py
-"""
-
 import csv
 import io
 import os
@@ -20,7 +11,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-BATCH_SIZES = [1, 32, 64, 128, 256, 512, 1024]
+BATCH_SIZES = [32, 64, 128, 256, 512, 1024, 2048, 4096]
 WARMUP = 5
 REPS = 20
 
@@ -33,11 +24,10 @@ os.makedirs("bench_results", exist_ok=True)
 def run_rust(op: str) -> list[dict]:
     binary = os.path.join("target", "release", "bench_runner")
     if not os.path.exists(binary):
-        print(f"[error] {binary} not found — run: cargo build --bin bench_runner --release",
-              file=sys.stderr)
+        print(f"[error] {binary} not found", file=sys.stderr)
         return []
 
-    result = subprocess.run([binary, op], capture_output=True, text=True)
+    result = subprocess.run([binary, op, *map(str, BATCH_SIZES)], capture_output=True, text=True)
     if result.returncode != 0:
         print(f"[error] bench_runner failed:\n{result.stderr}", file=sys.stderr)
         return []
@@ -112,7 +102,7 @@ def bench_torch_backward(net, batch_size):
 all_rows: list[dict] = []
 
 for mode in ("forward", "backward"):
-    print(f"\n=== Rust (bench_runner) — {mode} ===")
+    print(f"\n=== Rust (bench_runner) - {mode} ===")
     rust_rows = run_rust(mode)
     for r in rust_rows:
         bs = r["batch_size"]
@@ -121,14 +111,14 @@ for mode in ("forward", "backward"):
 
 torch_net = make_torch_net()
 
-print("\n=== PyTorch CPU — forward ===")
+print("\n=== PyTorch CPU - forward ===")
 for bs in BATCH_SIZES:
     mean_ns, std_ns = bench_torch_forward(torch_net, bs)
     all_rows.append({"framework": "torch_cpu", "mode": "forward",
                      "batch_size": bs, "mean_ns": mean_ns, "std_ns": std_ns})
     print(f"torch_cpu  bs={bs:4d}  {mean_ns/1e6:9.3f} ms  ±{std_ns/1e6:.3f} ms")
 
-print("\n=== PyTorch CPU — backward ===")
+print("\n=== PyTorch CPU - backward ===")
 for bs in BATCH_SIZES:
     mean_ns, std_ns = bench_torch_backward(torch_net, bs)
     all_rows.append({"framework": "torch_cpu", "mode": "backward",
@@ -150,7 +140,7 @@ COLORS  = {"rust_cpu": "#d62728", "torch_cpu": "#2ca02c"}
 MARKERS = {"rust_cpu": "o",       "torch_cpu": "^"}
 
 fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-fig.suptitle("MNIST net — Rust CPU vs PyTorch CPU")
+fig.suptitle("MNIST net - Rust CPU vs PyTorch CPU")
 
 for ax, mode in zip(axes, ("forward", "backward")):
     by_fw: dict[str, list] = defaultdict(list)

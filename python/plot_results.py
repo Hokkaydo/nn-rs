@@ -1,19 +1,3 @@
-"""
-Re-plot any previously collected benchmark results without re-running benchmarks.
-
-Reads:
-  bench_results/matmul.csv   — written by bench_matmul.py
-  bench_results/forward.csv  — written by bench_forward.py
-
-Writes:
-  bench_results/matmul_comparison.png
-  bench_results/forward_comparison.png
-  bench_results/backward_comparison.png
-
-Run from the repo root:
-    python python/plot_results.py
-"""
-
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -37,6 +21,7 @@ def _plot_latency(ax, rows_by_fw, x_col):
         ax.fill_between(x, mean_ms - std_ms, mean_ms + std_ms, alpha=0.15,
                         color=COLORS.get(fw, "grey"))
     ax.set_xscale("log", base=2)
+    ax.set_yscale("log", base=10)
     ax.set_ylabel("Latency (ms)")
     ax.legend()
     ax.grid(True, alpha=0.3)
@@ -70,6 +55,7 @@ if matmul_path.exists():
 
     ax_tput.set_xlabel("Matrix size N (NxN)")
     ax_tput.set_xscale("log", base=2)
+    ax_tput.set_yscale("log", base=10)
     ax_tput.set_ylabel("Throughput (GFLOP/s)")
     ax_tput.set_title("Throughput")
     ax_tput.legend()
@@ -81,7 +67,7 @@ if matmul_path.exists():
     print(f"Saved {out}")
     plt.close()
 else:
-    print(f"[skip] {matmul_path} not found — run python/bench_matmul.py first", file=sys.stderr)
+    print(f"[skip] {matmul_path} not found - run python/bench_matmul.py first", file=sys.stderr)
 
 # ---------------------------------------------------------------------------
 # forward / backward comparison
@@ -114,4 +100,4 @@ if fwd_path.exists():
         print(f"Saved {out}")
         plt.close()
 else:
-    print(f"[skip] {fwd_path} not found — run python/bench_forward.py first", file=sys.stderr)
+    print(f"[skip] {fwd_path} not found - run python/bench_forward.py first", file=sys.stderr)

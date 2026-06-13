@@ -6,17 +6,18 @@
 use std::hint::black_box;
 use std::time::Instant;
 
-use nn_rs::backend::autograd::engine::ReverseMode;
-use nn_rs::backend::autograd::{clear_grad_storage, clear_tape, Autograd};
-use nn_rs::backend::backend::{BinaryOps, MatMulOps};
-use nn_rs::backend::cpu::{mark_generation_start, truncate_to_generation, CPUBackend};
-use nn_rs::linalg::tensor::Tensor;
-use nn_rs::nn::activation::{LogSoftmax, ReLU};
-use nn_rs::nn::linear::Linear;
-use nn_rs::nn::loss::cross_entropy;
-use nn_rs::nn::models::Sequential;
-use nn_rs::nn::optimizer::{Optimizer, SGD};
-use nn_rs::nn::Layer;
+use nn_autograd::autograd::engine::ReverseMode;
+use nn_autograd::autograd::{clear_grad_storage, clear_tape, Autograd};
+use nn_core::backend::{BinaryOps, MatMulOps};
+use nn_core::cpu::{mark_generation_start, truncate_to_generation, CPUBackend};
+use nn_core::linalg::tensor::Tensor;
+use nn_nn::nn::activation::{LogSoftmax, ReLU};
+use nn_nn::nn::linear::Linear;
+use nn_nn::nn::loss::cross_entropy;
+use nn_nn::nn::models::Sequential;
+use nn_nn::nn::optimizer::{Optimizer, SGD};
+use nn_nn::nn::Layer;
+use nn_autograd::autograd::AutogradTensor;
 
 const WARMUP: usize = 5;
 const REPS: usize = 20;
@@ -68,7 +69,10 @@ fn bench_matmul() {
 // ---------------------------------------------------------------------------
 
 fn bench_elemwise() {
-    let sizes: &[usize] = &[1_000, 10_000, 100_000, 1_000_000, 10_000_000];
+    let sizes = &std::env::args()
+        .skip(2)
+        .map(|s| s.parse::<usize>().expect("size must be a positive integer"))
+        .collect::<Vec<_>>();
 
     for &sz in sizes {
         let a = Tensor::<CPUBackend, 1>::new(vec![1.0f32; sz], [sz]);
@@ -108,9 +112,12 @@ fn make_net() -> Sequential<CPUBackend> {
 }
 
 fn bench_forward() {
-    let batch_sizes: &[usize] = &[1, 32, 64, 128, 256, 512, 1024];
+    let sizes = &std::env::args()
+        .skip(2)
+        .map(|s| s.parse::<usize>().expect("size must be a positive integer"))
+        .collect::<Vec<_>>();
 
-    for &bs in batch_sizes {
+    for &bs in sizes {
         let net = make_net();
         mark_generation_start();
 
@@ -140,9 +147,12 @@ fn bench_forward() {
 // ---------------------------------------------------------------------------
 
 fn bench_backward() {
-    let batch_sizes: &[usize] = &[1, 32, 64, 128, 256, 512];
+    let sizes = &std::env::args()
+        .skip(2)
+        .map(|s| s.parse::<usize>().expect("size must be a positive integer"))
+        .collect::<Vec<_>>();
 
-    for &bs in batch_sizes {
+    for &bs in sizes {
         let net = make_net();
         let params = net.parameters();
         let mut opt = SGD::new(0.01);
