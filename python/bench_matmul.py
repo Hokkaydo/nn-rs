@@ -23,7 +23,7 @@ def run_rust(op: str) -> list[dict]:
     """Run the release bench_runner for a given op and return parsed rows."""
     binary = os.path.join("target", "release", "bench_runner")
     if not os.path.exists(binary):
-        print(f"[error] {binary} not found — run: cargo build --bin bench_runner --release",
+        print(f"[error] {binary} not found",
               file=sys.stderr)
         return []
 

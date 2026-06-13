@@ -1,6 +1,7 @@
 use nn_autograd::AutogradTensor;
 use nn_autograd::autograd::engine::ReverseMode;
 use nn_autograd::autograd::{Autograd, clear_grad_storage, clear_tape};
+use nn_core::backend::MatMulOps;
 use nn_core::cpu::CPUBackend;
 use nn_core::linalg::tensor::Tensor;
 
@@ -118,4 +119,54 @@ fn test_matmul_22_grad() {
     assert_eq!(grad_b.shape(), [2, 2]);
     assert_eq!(grad_a.as_slice(), expected_ga);
     assert_eq!(grad_b.as_slice(), expected_gb);
+}
+
+#[test]
+fn test_matmul_33_forward_shape() {
+    // [2, 3, 4] @ [2, 4, 5] → [2, 3, 5]
+    let a = Tensor::<CPUBackend, 3>::new(vec![1.0f32; 2 * 3 * 4], [2, 3, 4]);
+    let b = Tensor::<CPUBackend, 3>::new(vec![1.0f32; 2 * 4 * 5], [2, 4, 5]);
+    let c = CPUBackend::matmul_33(&a, &b);
+    assert_eq!(c.shape(), [2, 3, 5]);
+    // each output element = sum of 4 ones = 4.0
+    assert!(c.as_slice().iter().all(|&x| (x - 4.0).abs() < 1e-5));
+}
+
+#[test]
+fn test_matmul_33_grad() {
+    // Non-square, non-uniform values to catch axis transposition bugs.
+    // a:[2, 3, 4]  b:[2, 4, 5]  → c:[2, 3, 5]
+    let bs = 2;
+    let (m, k, n) = (3, 4, 5);
+    let a_data: Vec<f32> = (1..=bs * m * k).map(|x| x as f32 * 0.1).collect();
+    let b_data: Vec<f32> = (1..=bs * k * n).map(|x| x as f32 * 0.1).collect();
+
+    clear_tape();
+    clear_grad_storage();
+    let a = Tensor::<AG, 3>::with_grad(a_data.clone(), [bs, m, k]);
+    let b = Tensor::<AG, 3>::with_grad(b_data.clone(), [bs, k, n]);
+    let c = AG::matmul_33(&a, &b);
+    c.sum().backward::<ReverseMode>();
+
+    let ga = a.grad().unwrap();
+    let gb = b.grad().unwrap();
+
+    assert_eq!(ga.shape(), [bs, m, k]);
+    assert_eq!(gb.shape(), [bs, k, n]);
+
+    // Numeric check on a
+    let numeric_ga = numeric_grad_matrix(&a_data, bs * m, k, &|buf| {
+        let a_cpu = Tensor::<CPUBackend, 3>::new(buf.to_vec(), [bs, m, k]);
+        let b_cpu = Tensor::<CPUBackend, 3>::new(b_data.clone(), [bs, k, n]);
+        CPUBackend::matmul_33(&a_cpu, &b_cpu).as_slice().iter().sum()
+    });
+    assert_close(&ga.as_slice(), &numeric_ga);
+
+    // Numeric check on b
+    let numeric_gb = numeric_grad_matrix(&b_data, bs * k, n, &|buf| {
+        let a_cpu = Tensor::<CPUBackend, 3>::new(a_data.clone(), [bs, m, k]);
+        let b_cpu = Tensor::<CPUBackend, 3>::new(buf.to_vec(), [bs, k, n]);
+        CPUBackend::matmul_33(&a_cpu, &b_cpu).as_slice().iter().sum()
+    });
+    assert_close(&gb.as_slice(), &numeric_gb);
 }

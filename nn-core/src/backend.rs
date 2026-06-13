@@ -40,6 +40,8 @@ pub trait MatMulOps<B: Backend> {
     fn matmul_12(a: &Tensor<B, 1>, b: &Tensor<B, 2>) -> Tensor<B, 1>;
     fn matmul_21(a: &Tensor<B, 2>, b: &Tensor<B, 1>) -> Tensor<B, 1>;
     fn matmul_22(a: &Tensor<B, 2>, b: &Tensor<B, 2>) -> Tensor<B, 2>;
+    /// Batched matmul: `[batch, m, k] @ [batch, k, n] → [batch, m, n]`.
+    fn matmul_33(a: &Tensor<B, 3>, b: &Tensor<B, 3>) -> Tensor<B, 3>;
 }
 
 pub trait ScalarOps<B: Backend> {

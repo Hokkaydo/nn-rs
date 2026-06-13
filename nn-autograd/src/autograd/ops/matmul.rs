@@ -1,5 +1,5 @@
 use crate::autograd::{as_inner, wrap, Autograd, GradNode, GradOp};
-use nn_core::backend::{Backend, MatMulOps};
+use nn_core::backend::{Backend, MatMulOps, ShapeOps};
 use nn_core::linalg::tensor::Tensor;
 
 impl<B: Backend> MatMulOps<Self> for Autograd<B> {
@@ -47,6 +47,18 @@ impl<B: Backend> MatMulOps<Self> for Autograd<B> {
             inputs_ndims: vec![2, 2],
             output_id: result.id,
             output_ndim: 2,
+        });
+        wrap(result)
+    }
+
+    fn matmul_33(a: &Tensor<Self, 3>, b: &Tensor<Self, 3>) -> Tensor<Self, 3> {
+        let result = B::matmul_33(&as_inner(a), &as_inner(b));
+        Self::record_op(GradNode {
+            grad_op: GradOp::BatchedMatMul,
+            input_ids: vec![a.id, b.id],
+            inputs_ndims: vec![3, 3],
+            output_id: result.id,
+            output_ndim: 3,
         });
         wrap(result)
     }

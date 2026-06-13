@@ -39,7 +39,7 @@ if matmul_path.exists():
         by_fw[row["framework"]].append(row.to_dict())
 
     fig, (ax_lat, ax_tput) = plt.subplots(1, 2, figsize=(14, 5))
-    fig.suptitle("matmul NxN — Rust CPU vs NumPy vs PyTorch CPU")
+    fig.suptitle("matmul NxN - Rust CPU vs NumPy vs PyTorch CPU")
 
     _plot_latency(ax_lat, by_fw, "size")
     ax_lat.set_xlabel("Matrix size N (NxN)")
@@ -88,7 +88,7 @@ if fwd_path.exists():
             continue
 
         fig, ax = plt.subplots(figsize=(8, 5))
-        fig.suptitle(f"{mode} pass — Rust CPU vs PyTorch CPU (MNIST net)")
+        fig.suptitle(f"{mode} pass - Rust CPU vs PyTorch CPU (MNIST net)")
 
         _plot_latency(ax, by_fw, "batch_size")
         ax.set_xlabel("Batch size")

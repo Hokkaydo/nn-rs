@@ -60,7 +60,7 @@ impl AutogradStrategy for ReverseMode {
 
         let mut grads: HashMap<TensorId, GradValue<B>> = HashMap::new();
 
-        // Seed: ∂L/∂L = ones(output_shape)
+        // Seed: L/dL = ones(output_shape)
         let seed = Tensor::<B, NDIM>::ones(tensor.shape());
         grads.insert(tensor.id, GradValue::from_id(seed.id, NDIM));
 
@@ -111,7 +111,7 @@ impl AutogradStrategy for ReverseMode {
                 }
 
                 GradOp::Clamp { min, max } => {
-                    // ∂/∂a = go * (min < a < max ? 1 : 0)
+                    // d/da = go * (min < a < max ? 1 : 0)
                     let a = GradValue::<B>::from_id(node.input_ids[0], inp_ndim);
                     let mask = a.clamp_mask(*min, *max);
                     accumulate(node.input_ids[0], go.mul(&mask), &mut grads);
@@ -244,6 +244,21 @@ impl AutogradStrategy for ReverseMode {
                     }
                 }
 
+                GradOp::BatchedMatMul => {
+                    // a:[bs,m,k]  b:[bs,k,n]  out:[bs,m,n]
+                    // ∂L/∂A = go @ B^T  →  [bs,m,k]   (B^T swaps last two: [bs,n,k])
+                    // ∂L/∂B = A^T @ go  →  [bs,k,n]   (A^T swaps last two: [bs,k,m])
+                    let a: Tensor<B, 3> = Tensor::from_id(node.input_ids[0]);
+                    let b: Tensor<B, 3> = Tensor::from_id(node.input_ids[1]);
+                    let go3: Tensor<B, 3> = Tensor::from_id(go.id());
+                    let b_t = B::transpose(&b, Some([0, 2, 1]));
+                    let a_t = B::transpose(&a, Some([0, 2, 1]));
+                    let ga = GradValue::Rank3(B::matmul_33(&go3, &b_t));
+                    let gb = GradValue::Rank3(B::matmul_33(&a_t, &go3));
+                    accumulate(node.input_ids[0], ga, &mut grads);
+                    accumulate(node.input_ids[1], gb, &mut grads);
+                }
+
                 GradOp::Sum { .. } => {
                     // d/da = broadcast go back to input shape
                     let ga = go.broadcast_to_id(node.input_ids[0]);
@@ -294,6 +309,28 @@ impl AutogradStrategy for ReverseMode {
                             });
                             let transposed = B::transpose(&t, inv);
                             accumulate(node.input_ids[0], GradValue::Rank2(transposed), &mut grads);
+                        }
+                        GradValue::Rank3(t) => {
+                            let inv = axes.as_ref().map(|ax| {
+                                let mut inv = [0usize; 3];
+                                for (i, &j) in ax.iter().enumerate() {
+                                    inv[j] = i;
+                                }
+                                inv
+                            });
+                            let transposed = B::transpose(&t, inv);
+                            accumulate(node.input_ids[0], GradValue::Rank3(transposed), &mut grads);
+                        }
+                        GradValue::Rank4(t) => {
+                            let inv = axes.as_ref().map(|ax| {
+                                let mut inv = [0usize; 4];
+                                for (i, &j) in ax.iter().enumerate() {
+                                    inv[j] = i; 
+                                }
+                                inv
+                            });
+                            let transposed = B::transpose(&t, inv);
+                            accumulate(node.input_ids[0], GradValue::Rank4(transposed), &mut grads);
                         }
                     }
                 }

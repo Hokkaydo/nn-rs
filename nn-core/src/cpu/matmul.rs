@@ -444,4 +444,35 @@ impl MatMulOps<Self> for CPUBackend {
 
         Tensor::new(c, [m, n])
     }
+
+    fn matmul_33(a: &Tensor<Self, 3>, b: &Tensor<Self, 3>) -> Tensor<Self, 3> {
+        let [batch, m, k] = a.shape();
+        let [b_batch, b_k, n] = b.shape();
+        assert_eq!(batch, b_batch, "matmul_33 batch mismatch: {} vs {}", batch, b_batch);
+        assert_eq!(k, b_k, "matmul_33 inner dim mismatch: {} vs {}", k, b_k);
+
+        let a_s = a.strides();  // [batch_stride, row_stride, col_stride]
+        let b_s = b.strides();
+        let a_off = a.offset();
+        let b_off = b.offset();
+        let mut c = vec![0.0f32; batch * m * n];
+
+        a.with_data(|a_data| {
+            b.with_data(|b_data| {
+                for i in 0..batch {
+                    // Slice into c for this batch element: c[i*m*n .. (i+1)*m*n]
+                    let c_slice = &mut c[i * m * n..(i + 1) * m * n];
+                    matmul_22_impl(
+                        a_data, b_data, c_slice,
+                        m, n, k,
+                        // row/col strides within the slice are the last two strides of a/b
+                        a_s[1], a_s[2], a_off + i * a_s[0],
+                        b_s[1], b_s[2], b_off + i * b_s[0],
+                    );
+                }
+            });
+        });
+
+        Tensor::new(c, [batch, m, n])
+    }
 }

@@ -47,6 +47,7 @@ pub enum GradOp {
     DivScalar { scalar: Scalar },
     ScalarDiv { scalar: Scalar },
     MatMul,
+    BatchedMatMul,
     Tanh,
 
     // Reduction operations
@@ -248,3 +249,4 @@ pub(crate) fn store_grad(param_id: TensorId, grad_id: TensorId) {
 pub fn get_grad_id(param_id: TensorId) -> Option<TensorId> {
     GRAD_STORAGE.with(|s| s.borrow().get(&param_id).copied())
 }
+
