@@ -1,12 +1,12 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use nn_autograd::autograd::{Autograd, clear_tape};
-use nn_core::cpu::CPUBackend;
-use nn_core::cpu::{mark_generation_start, truncate_to_generation};
-use nn_core::linalg::tensor::Tensor;
-use nn_layers::nn::activation::{LogSoftmax, ReLU};
-use nn_layers::nn::linear::Linear;
-use nn_layers::nn::models::Sequential;
-use nn_layers::nn::Layer;
+use nn_la::cpu::CPUBackend;
+use nn_la::cpu::{mark_generation_start, truncate_to_generation};
+use nn_la::linalg::tensor::Tensor;
+use nn_core::tools::activation::{LogSoftmax, ReLU};
+use nn_core::tools::linear::Linear;
+use nn_core::tools::models::Sequential;
+use nn_core::tools::Layer;
 
 fn make_mnist_net() -> Sequential<CPUBackend> {
     Sequential::new(vec![

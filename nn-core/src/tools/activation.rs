@@ -1,6 +1,6 @@
 use nn_autograd::autograd::Autograd;
-use nn_core::backend::Backend;
-use nn_core::linalg::tensor::Tensor;
+use nn_la::backend::Backend;
+use nn_la::linalg::tensor::Tensor;
 
 pub struct ReLU<B: Backend> { 
     _marker: std::marker::PhantomData<B>,

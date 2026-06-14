@@ -1,6 +1,6 @@
 use nn_autograd::autograd::engine::GradValue;
-use nn_core::cpu::CPUBackend;
-use nn_core::linalg::tensor::Tensor;
+use nn_la::cpu::CPUBackend;
+use nn_la::linalg::tensor::Tensor;
 
 type GV = GradValue<CPUBackend>;
 

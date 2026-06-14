@@ -1,5 +1,5 @@
-use nn_core::linalg::tensor::Tensor;
-use nn_core::cpu::CPUBackend;
+use nn_la::linalg::tensor::Tensor;
+use nn_la::cpu::CPUBackend;
 
 
 #[cfg(test)]

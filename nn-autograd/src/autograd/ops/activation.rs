@@ -1,6 +1,6 @@
 use crate::autograd::{as_inner, wrap, Autograd, GradNode, GradOp};
-use nn_core::backend::{ActivationOps, Backend};
-use nn_core::linalg::tensor::Tensor;
+use nn_la::backend::{ActivationOps, Backend};
+use nn_la::linalg::tensor::Tensor;
 
 impl<B: Backend> ActivationOps<Self> for Autograd<B> {
     fn sigmoid<const NDIM: usize>(tensor: &Tensor<Self, NDIM>) -> Tensor<Self, NDIM> {

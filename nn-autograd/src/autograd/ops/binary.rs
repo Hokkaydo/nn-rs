@@ -1,6 +1,6 @@
 use crate::autograd::{as_inner, wrap, Autograd, GradNode, GradOp};
-use nn_core::backend::{Backend, BinaryOps, ReverseScalarOps, ScalarOps};
-use nn_core::linalg::tensor::{Scalar, Tensor};
+use nn_la::backend::{Backend, BinaryOps, ReverseScalarOps, ScalarOps};
+use nn_la::linalg::tensor::{Scalar, Tensor};
 
 impl<B: Backend> BinaryOps<Self> for Autograd<B> {
     fn add<const NDIM: usize>(

@@ -4,4 +4,4 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-nn-core = { path = "../nn-core" }
+nn-la = { path = "../nn-la" }

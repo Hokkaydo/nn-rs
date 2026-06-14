@@ -2,8 +2,8 @@ use std::io::{Read, Write};
 
 use nn_autograd::autograd::Autograd;
 use nn_autograd::autograd::AutogradTensor;
-use nn_core::backend::Backend;
-use nn_core::linalg::tensor::{Scalar, Tensor, TensorId};
+use nn_la::backend::Backend;
+use nn_la::linalg::tensor::{Scalar, Tensor, TensorId};
 use rand::Rng;
 
 pub struct Linear<B: Backend> {

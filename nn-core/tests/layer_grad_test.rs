@@ -1,8 +1,8 @@
 use nn_autograd::autograd::Autograd;
 use nn_autograd::autograd::engine::ReverseMode;
-use nn_core::cpu::CPUBackend;
-use nn_core::linalg::tensor::Tensor;
-use nn_layers::nn::linear::Linear;
+use nn_la::cpu::CPUBackend;
+use nn_la::linalg::tensor::Tensor;
+use nn_core::tools::linear::Linear;
 use nn_autograd::autograd::AutogradTensor;
 
 type AG = Autograd<CPUBackend>;

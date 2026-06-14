@@ -8,15 +8,15 @@ use std::time::Instant;
 
 use nn_autograd::autograd::engine::ReverseMode;
 use nn_autograd::autograd::{clear_grad_storage, clear_tape, Autograd};
-use nn_core::backend::{BinaryOps, MatMulOps};
-use nn_core::cpu::{mark_generation_start, truncate_to_generation, CPUBackend};
-use nn_core::linalg::tensor::Tensor;
-use nn_layers::nn::activation::{LogSoftmax, ReLU};
-use nn_layers::nn::linear::Linear;
-use nn_layers::nn::loss::cross_entropy;
-use nn_layers::nn::models::Sequential;
-use nn_layers::nn::optimizer::{Optimizer, SGD};
-use nn_layers::nn::Layer;
+use nn_la::backend::{BinaryOps, MatMulOps};
+use nn_la::cpu::{mark_generation_start, truncate_to_generation, CPUBackend};
+use nn_la::linalg::tensor::Tensor;
+use nn_core::tools::activation::{LogSoftmax, ReLU};
+use nn_core::tools::linear::Linear;
+use nn_core::tools::loss::cross_entropy;
+use nn_core::tools::models::Sequential;
+use nn_core::tools::optimizer::{Optimizer, SGD};
+use nn_core::tools::Layer;
 use nn_autograd::autograd::AutogradTensor;
 
 const WARMUP: usize = 5;

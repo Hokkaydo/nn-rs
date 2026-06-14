@@ -1,6 +1,6 @@
 use crate::autograd::{Autograd, GradNode};
-use nn_core::backend::Backend;
-use nn_core::linalg::tensor::{Scalar, Tensor, TensorId};
+use nn_la::backend::Backend;
+use nn_la::linalg::tensor::{Scalar, Tensor, TensorId};
 use std::collections::HashMap;
 use std::marker::PhantomData;
 

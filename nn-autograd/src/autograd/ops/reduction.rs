@@ -1,6 +1,6 @@
 use crate::autograd::{as_inner, wrap, Autograd, GradNode, GradOp};
-use nn_core::backend::{Backend, ReductionOps};
-use nn_core::linalg::tensor::Tensor;
+use nn_la::backend::{Backend, ReductionOps};
+use nn_la::linalg::tensor::Tensor;
 
 impl<B: Backend> ReductionOps<Self> for Autograd<B> {
     fn sum<const NDIM: usize>(

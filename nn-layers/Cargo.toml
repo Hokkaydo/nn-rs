@@ -1,9 +1,9 @@
 [package]
-name = "nn-layers"
+name = "nn-core"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 nn-autograd = { path = "../nn-autograd" }
-nn-core = { path = "../nn-core" }
+nn-la = { path = "../nn-la" }
 rand = "0.9.1"

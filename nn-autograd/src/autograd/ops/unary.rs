@@ -1,6 +1,6 @@
 use crate::autograd::{as_inner, wrap, Autograd, GradNode, GradOp};
-use nn_core::backend::{Backend, UnaryOps};
-use nn_core::linalg::tensor::{Scalar, Tensor};
+use nn_la::backend::{Backend, UnaryOps};
+use nn_la::linalg::tensor::{Scalar, Tensor};
 
 impl<B: Backend> UnaryOps<Self> for Autograd<B> {
     fn neg<const NDIM: usize>(tensor: &Tensor<Self, NDIM>) -> Tensor<Self, NDIM> {

@@ -1,6 +1,6 @@
 use crate::autograd::{as_inner, wrap, Autograd, GradNode, GradOp};
-use nn_core::backend::{Backend, ShapeOps};
-use nn_core::linalg::tensor::Tensor;
+use nn_la::backend::{Backend, ShapeOps};
+use nn_la::linalg::tensor::Tensor;
 
 impl<B: Backend> ShapeOps<Self> for Autograd<B> {
     fn reshape<const NDIM: usize>(

@@ -7,10 +7,10 @@ pub mod optimizer;
 use std::io::{Read, Write};
 
 use nn_autograd::autograd::Autograd;
-use nn_core::backend::Backend;
-use nn_core::linalg::tensor::{Tensor, TensorId};
-use crate::nn::activation::*;
-use crate::nn::linear::*;
+use nn_la::backend::Backend;
+use nn_la::linalg::tensor::{Tensor, TensorId};
+use crate::tools::activation::*;
+use crate::tools::linear::*;
 
 
 pub enum Layer<B: Backend> {

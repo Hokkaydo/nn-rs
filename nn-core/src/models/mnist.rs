@@ -1,15 +1,15 @@
 use nn_autograd::autograd::engine::ReverseMode;
 use nn_autograd::autograd::AutogradTensor;
 use nn_autograd::autograd::{Autograd, clear_tape};
-use nn_core::backend::Backend;
-use nn_core::cpu::{mark_generation_start, truncate_to_generation};
-use nn_core::linalg::tensor::{Scalar, Tensor};
-use crate::nn::Layer;
-use crate::nn::activation::{ReLU, Softmax};
-use crate::nn::linear::Linear;
-use crate::nn::loss::cross_entropy;
-use crate::nn::models::Sequential;
-use crate::nn::optimizer::Optimizer;
+use nn_la::backend::Backend;
+use nn_la::cpu::{mark_generation_start, truncate_to_generation};
+use nn_la::linalg::tensor::{Scalar, Tensor};
+use crate::tools::Layer;
+use crate::tools::activation::{ReLU, Softmax};
+use crate::tools::linear::Linear;
+use crate::tools::loss::cross_entropy;
+use crate::tools::models::Sequential;
+use crate::tools::optimizer::Optimizer;
 use rand::seq::SliceRandom;
 use std::io::{BufWriter, Read};
 

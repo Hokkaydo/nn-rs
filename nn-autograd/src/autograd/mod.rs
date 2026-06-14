@@ -1,10 +1,10 @@
 mod ops;
 pub mod engine;
 
-use nn_core::backend::{
+use nn_la::backend::{
     Backend, TensorOps,
 };
-use nn_core::linalg::tensor::{Scalar, Tensor, TensorId};
+use nn_la::linalg::tensor::{Scalar, Tensor, TensorId};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;

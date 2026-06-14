@@ -1,6 +1,6 @@
 use nn_autograd::autograd;
-use nn_core::cpu::{data_by_id, with_mut_data_by_id};
-use nn_core::linalg::tensor::{Scalar, TensorId};
+use nn_la::cpu::{data_by_id, with_mut_data_by_id};
+use nn_la::linalg::tensor::{Scalar, TensorId};
 use nn_autograd::autograd::clear_grad_storage;
 
 pub trait Optimizer {

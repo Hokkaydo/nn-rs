@@ -1,7 +1,7 @@
 use crate::autograd::engine::{AutogradStrategy, GradValue};
 use crate::autograd::{Autograd, GradNode, GradOp, store_grad};
-use nn_core::backend::Backend;
-use nn_core::linalg::tensor::{Tensor, TensorId};
+use nn_la::backend::Backend;
+use nn_la::linalg::tensor::{Tensor, TensorId};
 use std::collections::{HashMap, HashSet};
 
 pub struct ReverseMode;

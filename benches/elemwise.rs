@@ -1,8 +1,8 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use nn_core::backend::BinaryOps;
-use nn_core::cpu::CPUBackend;
-use nn_core::linalg::tensor::Tensor;
-use nn_core::cpu::{mark_generation_start, truncate_to_generation};
+use nn_la::backend::BinaryOps;
+use nn_la::cpu::CPUBackend;
+use nn_la::linalg::tensor::Tensor;
+use nn_la::cpu::{mark_generation_start, truncate_to_generation};
 
 fn bench_add(c: &mut Criterion) {
     let mut group = c.benchmark_group("elemwise_add");

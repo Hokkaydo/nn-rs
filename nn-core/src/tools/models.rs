@@ -2,9 +2,9 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 
 use nn_autograd::autograd::Autograd;
-use nn_core::backend::Backend;
-use nn_core::linalg::tensor::{Tensor, TensorId};
-use crate::nn::Layer;
+use nn_la::backend::Backend;
+use nn_la::linalg::tensor::{Tensor, TensorId};
+use crate::tools::Layer;
 
 pub struct Sequential<B: Backend> {
     layers: Vec<Layer<B>>,
